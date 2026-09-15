@@ -20,7 +20,7 @@ public class DynamoDbTableInitializer {
 
     private final DynamoDbEnhancedClient enhancedClient;
 
-    @Value("${dynamodb.create-tables:true}")
+    @Value("${dynamodb.create-tables:false}")
     private boolean createTables;
 
     public DynamoDbTableInitializer(
@@ -39,7 +39,7 @@ public class DynamoDbTableInitializer {
         log.info("dynamodb.create-tables = {}", createTables);
         log.info("======================================");
 
-        if (!createTables) {
+        if (createTables) {
             log.warn("DynamoDB table creation is DISABLED");
             return;
         }
