@@ -1,0 +1,32 @@
+spring:
+  kafka:
+    listener:
+      ack-mode: manual
+    bootstrap-servers: ${spring.kafka.bootstrap-servers}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+      consumer:
+        group-id: task-event-group
+        enable-auto-commit: false
+        key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+        value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+
+        properties:
+          spring.json.trusted.packages: "com.daily_note.search_text_app.entity"
+
+    properties:
+      security.protocol: SASL_SSL
+      sasl.mechanism: SCRAM-SHA-256
+      sasl.jaas.config: >
+        org.apache.kafka.common.security.scram.ScramLoginModule required
+        username="${spring.kafka.properties.sasl.jaas.config.username}"
+        password="${spring.kafka.properties.sasl.jaas.config.password}";
+
+      ssl.truststore.location: C:/work-space/search_text_app/src/main/resources/kafka-ca.pem
+      ssl.truststore.type: PEM
+
+    consumer:
+      group-id: task-search-service
+      auto-offset-reset: latest
