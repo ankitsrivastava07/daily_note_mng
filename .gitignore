@@ -1,0 +1,72 @@
+# Maven
+**/target/
+
+# IntelliJ IDEA
+**/.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Local / production configuration containing secrets
+**/application-local.yml
+**/application-local.yaml
+**/application-prod.yml
+**/application-prod.yaml
+**/application-secrets.yml
+
+# Credentials
+**/*credentials*.csv
+**/*credentials*.json
+**/*.jks
+**/*.p12
+**/*.pfx
+**/*.key
+**/*secret*
+
+# AWS
+.aws/
+
+# Node / React
+**/node_modules/
+**/dist/
+**/.vite/
+
+# Coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+
+
+**/target/
+**/.idea/
+**/node_modules/
+**/dist/
+
+.env
+.env.*
+
+*.log
+
+**/*credentials*
+**/*.jks
+**/*.p12
+**/*.key
