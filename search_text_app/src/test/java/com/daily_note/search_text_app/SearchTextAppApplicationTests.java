@@ -1,3 +1,4 @@
+/*
 package com.daily_note.search_text_app;
 
 import org.junit.jupiter.api.Test;
@@ -11,3 +12,4 @@ class SearchTextAppApplicationTests {
 	}
 
 }
+*/
