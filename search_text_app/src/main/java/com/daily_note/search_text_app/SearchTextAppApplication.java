@@ -10,7 +10,7 @@ public class SearchTextAppApplication {
         SpringApplication application =
                 new SpringApplication(SearchTextAppApplication.class);
 
-        application.setLazyInitialization(true);
+        // application.setLazyInitialization(true);
 
         application.run(args);
     }

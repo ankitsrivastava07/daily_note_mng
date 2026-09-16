@@ -10,12 +10,11 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 
 @ControllerAdvice
 public class GlobalExceptionHandler {
-
-    private Logger logger = LoggerFactory.getLogger("");
+    private final Logger logger = LoggerFactory.getLogger("");
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleException(Exception exp) {
-        logger.info("Exception has occurred {}", exp.getLocalizedMessage());
+        logger.info("Exception has occurred {} at {} ", exp.getLocalizedMessage(), System.currentTimeMillis());
         ApiResponse apiResponse = new ApiResponse();
         apiResponse.setMsg(exp.getLocalizedMessage());
         apiResponse.setFlag(Boolean.FALSE);
