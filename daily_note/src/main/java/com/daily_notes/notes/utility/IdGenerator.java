@@ -1,10 +1,10 @@
 package com.daily_notes.notes.utility;
 
-import cn.hutool.core.util.IdUtil;
+import java.util.UUID;
 
 public class IdGenerator {
 
     public static String generateId() {
-        return IdUtil.getSnowflakeNextIdStr();
+        return UUID.randomUUID().toString();
     }
 }

@@ -1,12 +1,12 @@
 package com.daily_notes.notes.service;
 
-import cn.hutool.core.util.IdUtil;
 import com.daily_notes.notes.dao.WorkspaceNodeDaoImpl;
 import com.daily_notes.notes.dto.CreateWorkspaceNodeDto;
 import com.daily_notes.notes.entity.WorkspaceNodeEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class WorkspaceNodeService {
@@ -19,7 +19,7 @@ public class WorkspaceNodeService {
 
     public WorkspaceNodeEntity createNode(String workspaceId, CreateWorkspaceNodeDto dto) {
         WorkspaceNodeEntity entity = new WorkspaceNodeEntity();
-        entity.setId(IdUtil.getSnowflakeNextIdStr());
+        entity.setId(UUID.randomUUID().toString());
         entity.setWorkspaceId(workspaceId);
         entity.setParentId(
                 dto.getParentId() == null || dto.getParentId().isBlank()

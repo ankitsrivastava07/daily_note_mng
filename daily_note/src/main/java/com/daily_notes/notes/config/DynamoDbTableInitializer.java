@@ -1,3 +1,4 @@
+/*
 package com.daily_notes.notes.config;
 
 import com.daily_notes.notes.entity.*;
@@ -93,4 +94,4 @@ public class DynamoDbTableInitializer {
             throw e;
         }
     }
-}
+}*/
