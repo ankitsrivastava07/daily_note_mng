@@ -8,6 +8,7 @@ import com.daily_notes.notes.mapper.CustomMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,7 +19,15 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 
 import java.util.List;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+
 @Component
+@EnableScheduling
+@ConditionalOnProperty(
+        name = "outbox.scheduler.enabled",
+        havingValue = "true",
+        matchIfMissing = false
+)
 public class OutboxEventScheduler {
 
     private static final Logger logger =
