@@ -1,14 +1,15 @@
+/*
 package com.daily_note.search_text_app.mapper;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
+@Component
 public class CustomMapper {
-    private final static ObjectMapper mapper = new ObjectMapper()
-            .registerModule(new JavaTimeModule());
+    private static final ObjectMapper mapper = new ObjectMapper();
 
     private static Logger logger = LoggerFactory.getLogger(CustomMapper.class);
 
@@ -30,7 +31,7 @@ public class CustomMapper {
             logger.info("Map To Json Entity {}", actualJson);
             return mapper.readValue(actualJson, targetType);
 
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new RuntimeException(
                     "Failed to convert JSON to object",
                     e
@@ -38,3 +39,4 @@ public class CustomMapper {
         }
     }
 }
+*/

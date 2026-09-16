@@ -1,7 +1,6 @@
 package com.daily_note.search_text_app.service;
 
 import com.daily_note.search_text_app.entity.TaskSearchDocument;
-import com.daily_note.search_text_app.repo.TaskSearchDocumentRepo;
 import org.springframework.data.domain.*;
 import org.springframework.data.elasticsearch.client.elc.NativeQuery;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
@@ -14,11 +13,9 @@ import java.util.List;
 @Service
 public class TaskSearchService {
 
-    private final TaskSearchDocumentRepo repository;
     private final ElasticsearchOperations elasticsearchOperations;
 
-    public TaskSearchService(TaskSearchDocumentRepo repository, ElasticsearchOperations elasticsearchOperations) {
-        this.repository = repository;
+    public TaskSearchService(ElasticsearchOperations elasticsearchOperations) {
         this.elasticsearchOperations = elasticsearchOperations;
     }
 

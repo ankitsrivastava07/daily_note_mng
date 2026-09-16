@@ -1,3 +1,4 @@
+/*
 package com.daily_note.search_text_app.config;
 
 import org.springframework.context.annotation.Configuration;
@@ -26,4 +27,4 @@ public class CorsConfig implements WebMvcConfigurer {
                 .allowedHeaders("*")
                 .allowCredentials(true);
     }
-}
+}*/

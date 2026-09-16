@@ -1,3 +1,4 @@
+/*
 package com.daily_note.search_text_app.service;
 
 import com.daily_note.search_text_app.dto.TaskEvent;
@@ -152,4 +153,4 @@ public class KafkaTaskEventConsumerService {
                 event.getEventId()
         );
     }
-}
+}*/
