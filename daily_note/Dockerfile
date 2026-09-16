@@ -1,14 +1,16 @@
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jdk
 
 WORKDIR /app
 
-COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.0.1 \
-     /lambda-adapter /opt/extensions/lambda-adapter
+# Lambda Web Adapter
+COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 \
+    /lambda-adapter /opt/extensions/lambda-adapter
 
 COPY target/*.jar app.jar
 
-ENV AWS_LWA_PORT=9091
-
 EXPOSE 9091
 
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENV AWS_LWA_PORT=9091
+ENV AWS_LWA_READINESS_CHECK_PATH=/health
+
+ENTRYPOINT ["java", "-jar", "app.jar"]
