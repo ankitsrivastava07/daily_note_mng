@@ -63,7 +63,10 @@ function GetAllTask() {
             }
 
             const response = await fetch(url, {
-                method: "GET"
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json"
+                }
             });
 
             if (!response.ok) {
