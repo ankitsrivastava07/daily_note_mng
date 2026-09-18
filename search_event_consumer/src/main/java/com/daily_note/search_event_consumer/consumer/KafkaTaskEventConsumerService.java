@@ -128,7 +128,6 @@ public class KafkaTaskEventConsumerService {
         TaskSearchDocument document =
                 new TaskSearchDocument();
 
-        document.setDueDate(event.getDueDate());
         document.setDueTime(event.getDueTime());
         document.setUserId(event.getUserId());
         document.setTaskId(event.getTaskId());

@@ -9,7 +9,7 @@ public class TaskEvent {
     private String eventType;
     private String taskId;
     private String dueDate;
-    private String dueTime;
+    private LocalDate dueTime;
 
     public String getDueDate() {
         return dueDate;
@@ -19,11 +19,11 @@ public class TaskEvent {
         this.dueDate = dueDate;
     }
 
-    public String getDueTime() {
+    public LocalDate getDueTime() {
         return dueTime;
     }
 
-    public void setDueTime(String dueTime) {
+    public void setDueTime(LocalDate dueTime) {
         this.dueTime = dueTime;
     }
 

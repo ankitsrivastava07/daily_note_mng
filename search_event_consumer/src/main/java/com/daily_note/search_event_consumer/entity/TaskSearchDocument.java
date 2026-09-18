@@ -7,6 +7,7 @@ import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 @Document(indexName = "tasks")
 public class TaskSearchDocument {
@@ -19,15 +20,15 @@ public class TaskSearchDocument {
         this.version = version;
     }
 
-    public String getDueDate() {
+    public LocalDate getDueDate() {
         return dueDate;
     }
 
-    public void setDueDate(String dueDate) {
+    public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
     }
 
-    public String getDueTime() {
+    public LocalDate getDueTime() {
         return dueTime;
     }
 
@@ -39,7 +40,7 @@ public class TaskSearchDocument {
         this.meridiem = meridiem;
     }
 
-    public void setDueTime(String dueTime) {
+    public void setDueTime(LocalDate dueTime) {
         this.dueTime = dueTime;
     }
 
@@ -52,8 +53,8 @@ public class TaskSearchDocument {
                     DateFormat.date_time
             }
     )
-    private String dueDate;
-    private String dueTime;
+    private LocalDate dueDate;
+    private LocalDate dueTime;
     private String meridiem;
 
     public String getTaskId() {

@@ -2,11 +2,16 @@ package com.daily_note.search_event_consumer.mapper;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class CustomMapper {
-    private static final com.fasterxml.jackson.databind.ObjectMapper mapper = new ObjectMapper();
+    private static final ObjectMapper mapper =
+            new ObjectMapper()
+                    .registerModule(new JavaTimeModule())
+                    .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
     private static Logger logger = LoggerFactory.getLogger(CustomMapper.class);
 
     public static <T> T mapToEntity(Object source, Class<T> targetType) {
@@ -28,7 +33,7 @@ public class CustomMapper {
             return mapper.readValue(actualJson, targetType);
 
         } catch (JsonProcessingException e) {
-            logger.info("");
+            logger.info("JsonProcessingException has occured {}", e.getLocalizedMessage());
             throw new RuntimeException(
                     "Failed to convert JSON to object",
                     e
