@@ -8,7 +8,7 @@ import java.util.List;
 
 public interface TaskService {
 
-    ApiResponse createTask(String userId, TaskDto taskDto);
+    ApiResponse createTask(TaskDto taskDto);
 
     ApiResponse getAllTasksByUserId(String userId, Integer limit, String lastId, String search);
 }

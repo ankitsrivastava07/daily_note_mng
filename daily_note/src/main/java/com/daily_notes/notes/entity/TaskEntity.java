@@ -10,11 +10,11 @@ public class TaskEntity extends BaseEntity {
 
     private String name;
 
-    public LocalDate getDueDate() {
+    public String getDueDate() {
         return dueDate;
     }
 
-    public void setDueDate(LocalDate dueDate) {
+    public void setDueDate(String dueDate) {
         this.dueDate = dueDate;
     }
 
@@ -31,7 +31,7 @@ public class TaskEntity extends BaseEntity {
     }
 
     private String slugName;
-    private LocalDate dueDate;
+    private String dueDate;
 
     public String getName() {
         return name;

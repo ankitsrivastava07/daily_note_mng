@@ -1,4 +1,4 @@
-package com.daily_note.search_text_app.entity;
+package com.daily_note.search_event_consumer.entity;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.elasticsearch.annotations.DateFormat;
@@ -7,7 +7,6 @@ import org.springframework.data.elasticsearch.annotations.Field;
 import org.springframework.data.elasticsearch.annotations.FieldType;
 
 import java.time.Instant;
-import java.time.LocalDate;
 
 @Document(indexName = "tasks")
 public class TaskSearchDocument {
@@ -46,6 +45,13 @@ public class TaskSearchDocument {
 
     @Id
     private String id;
+    @Field(
+            type = FieldType.Date,
+            format = {
+                    DateFormat.date,
+                    DateFormat.date_time
+            }
+    )
     private String dueDate;
     private String dueTime;
     private String meridiem;

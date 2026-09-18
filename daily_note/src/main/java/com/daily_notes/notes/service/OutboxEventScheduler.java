@@ -25,7 +25,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 @EnableScheduling
 @ConditionalOnProperty(
         name = "outbox.scheduler.enabled",
-        havingValue = "true",
+        havingValue = "${outbox.scheduler.enabled}",
         matchIfMissing = false
 )
 public class OutboxEventScheduler {

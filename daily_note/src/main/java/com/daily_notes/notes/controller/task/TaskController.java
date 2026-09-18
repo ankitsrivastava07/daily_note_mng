@@ -20,10 +20,10 @@ public class TaskController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllTasksByUserId(@RequestParam String userId,
-                                                 @RequestParam Integer limit,
+    public ResponseEntity<?> getAllTasksByUserId(@PathVariable String userId,
+                                                 @RequestParam Integer size,
                                                  @RequestParam String lastId,
                                                  @RequestParam String search) {
-        return new ResponseEntity<>(taskService.getAllTasksByUserId(userId, limit, lastId, search), HttpStatus.OK);
+        return new ResponseEntity<>(taskService.getAllTasksByUserId(userId, size, lastId, search), HttpStatus.OK);
     }
 }

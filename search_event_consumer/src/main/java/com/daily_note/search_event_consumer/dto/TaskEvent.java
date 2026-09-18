@@ -1,6 +1,7 @@
-package com.daily_notes.notes.dto;
+package com.daily_note.search_event_consumer.dto;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 public class TaskEvent {
 
@@ -8,6 +9,7 @@ public class TaskEvent {
     private String eventType;
     private String taskId;
     private String dueDate;
+    private String dueTime;
 
     public String getDueDate() {
         return dueDate;
@@ -16,8 +18,6 @@ public class TaskEvent {
     public void setDueDate(String dueDate) {
         this.dueDate = dueDate;
     }
-
-    private String dueTime;
 
     public String getDueTime() {
         return dueTime;
