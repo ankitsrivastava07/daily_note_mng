@@ -593,7 +593,7 @@ public class OutboxStreamHandler
     private static String getRequiredEnvironmentVariable(
             String name) {
 
-        String value = "create_event_task";
+        String value = System.getenv(name);
 
         if (value == null || value.isBlank()) {
             throw new IllegalStateException(
