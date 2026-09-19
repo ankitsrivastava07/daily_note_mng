@@ -1,13 +1,49 @@
 package com.daily_notes.notes.dto;
 
-import java.time.Instant;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.databind.JsonNode;
 
+import java.time.Instant;
+import java.time.LocalDate;
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TaskEvent {
 
     private String eventId;
     private String eventType;
     private String taskId;
     private String dueDate;
+
+    @JsonSetter("dueDate")
+    public void setDueDate(JsonNode value) {
+
+        if (value == null || value.isNull()) {
+            this.dueDate = null;
+            return;
+        }
+
+        // New format: "2026-09-18"
+        if (value.isTextual()) {
+            this.dueDate = value.asText();
+            return;
+        }
+
+        // Old format: [2026, 9, 17]
+        if (value.isArray() && value.size() >= 3) {
+            this.dueDate = LocalDate.of(
+                    value.get(0).asInt(),
+                    value.get(1).asInt(),
+                    value.get(2).asInt()
+            ).toString();
+
+            return;
+        }
+
+        throw new IllegalArgumentException(
+                "Unsupported dueDate format: " + value
+        );
+    }
 
     public String getDueDate() {
         return dueDate;

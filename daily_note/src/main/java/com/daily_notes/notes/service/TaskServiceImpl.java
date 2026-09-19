@@ -66,6 +66,7 @@ public class TaskServiceImpl implements TaskService {
         taskEntity.setId(taskId);
         taskEntity.setUserId(userId);
 
+        taskEntity.setDueDate(taskDto.dueDate());
         OutboxEventEntity event =
                 new OutboxEventEntity();
 

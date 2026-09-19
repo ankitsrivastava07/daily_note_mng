@@ -1,3 +1,4 @@
+/*
 package com.daily_notes.notes.service;
 
 import com.daily_notes.notes.dto.TaskEvent;
@@ -25,7 +26,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 @EnableScheduling
 @ConditionalOnProperty(
         name = "outbox.scheduler.enabled",
-        havingValue = "${outbox.scheduler.enabled}",
+        havingValue = "true",
         matchIfMissing = false
 )
 public class OutboxEventScheduler {
@@ -140,4 +141,4 @@ public class OutboxEventScheduler {
             );
         }
     }
-}
+}*/
