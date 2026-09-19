@@ -1,4 +1,3 @@
-/*
 
 package com.daily_notes.notes.config;
 
@@ -58,4 +57,4 @@ public class CorsFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 }
-*/
+
