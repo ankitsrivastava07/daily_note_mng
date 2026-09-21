@@ -62,22 +62,6 @@ public class TaskEvent {
     private Instant createdAt;
     private Instant updateAt;
 
-
-    @Override
-    public String toString() {
-        return "TaskEvent{" +
-                "eventId='" + eventId + '\'' +
-                ", eventType='" + eventType + '\'' +
-                ", taskId='" + taskId + '\'' +
-                ", userId='" + userId + '\'' +
-                ", name='" + name + '\'' +
-                ", content='" + content + '\'' +
-                ", priority='" + priority + '\'' +
-                ", status='" + status + '\'' +
-                ", version=" + version +
-                '}';
-    }
-
     public TaskEvent() {
     }
 
@@ -151,5 +135,20 @@ public class TaskEvent {
 
     public void setVersion(Long version) {
         this.version = version;
+    }
+
+    @Override
+    public String toString() {
+        return "TaskEvent{" +
+                "eventId='" + eventId + '\'' +
+                ", eventType='" + eventType + '\'' +
+                ", taskId='" + taskId + '\'' +
+                ", userId='" + userId + '\'' +
+                ", name='" + name + '\'' +
+                ", content='" + content + '\'' +
+                ", priority='" + priority + '\'' +
+                ", status='" + status + '\'' +
+                ", version=" + version +
+                '}';
     }
 }
