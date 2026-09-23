@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - "daily_note/**"
+      - ".github/workflows/deploy-daily-note.yml"
 
 env:
   AWS_REGION: ap-south-1
@@ -15,9 +18,28 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # 1. Build Spring Boot JAR FIRST
+      - name: Build Daily Note application
+        working-directory: ./daily_note
+        run: mvn clean package -DskipTests
+
+      # 2. Verify JAR exists
+      - name: Verify generated JAR
+        run: |
+          echo "Checking generated JAR..."
+          ls -lah ./daily_note/target/
+
+      # 3. Configure AWS
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -25,19 +47,27 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_ECR_SECRET_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # 4. Login ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Docker image
+      # 5. Docker build + push
+      - name: Build and push image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build \
+            -f ./daily_note/Dockerfile \
+            -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            ./daily_note
 
-      - name: Update Lambda with new image
+          docker push \
+            $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      # 6. Tell Lambda to use this exact new image
+      - name: Deploy image to Lambda
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
@@ -47,11 +77,9 @@ jobs:
             --image-uri $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
             --region $AWS_REGION
 
+      # 7. Wait until Lambda finishes updating
       - name: Wait for Lambda deployment
         run: |
           aws lambda wait function-updated \
             --function-name $LAMBDA_FUNCTION \
             --region $AWS_REGION
-
-      - name: Deployment completed
-        run: echo "Daily Note Lambda deployment completed successfully"
