@@ -30,9 +30,9 @@ public class S3ServiceImpl implements S3Service {
     @Bulkhead(name = "GENERATE_PRESIGNED_URL",
             type = Bulkhead.Type.SEMAPHORE
             , fallbackMethod = "generateUploadUrlFallbackMethod")
-    public ApiResponse generateUploadUrl(CreatePresignedUrlRequest createPresignedUrlRequest) {
+    public String createPresignedURL(CreatePresignedUrlRequest createPresignedUrlRequest) {
         //String path = dmsConstant.getS3BucketFolder(createPresignedUrlRequest.contentType());
-        String objectKey = createPresignedUrlRequest.noteId() + "/" + System.currentTimeMillis() + "_" + createPresignedUrlRequest.fileName();
+        String objectKey = createPresignedUrlRequest.referenceId() + "/" + System.currentTimeMillis() + "_" + createPresignedUrlRequest.fileName();
 
         // 2. Lock ContentType into the AWS S3 signature
         PutObjectRequest objectRequest = PutObjectRequest.builder()
@@ -48,10 +48,7 @@ public class S3ServiceImpl implements S3Service {
 
         PresignedPutObjectRequest presignedRequest = s3Presigner.presignPutObject(presignRequest);
 
-        return new ApiResponse()
-                .message("Success")
-                .data(presignedRequest.url().toString())
-                .status(Boolean.TRUE);
+        return presignedRequest.url().toString();
     }
 
     public ApiResponse generateUploadUrlFallback(CreatePresignedUrlRequest createPresignedUrlRequest) {

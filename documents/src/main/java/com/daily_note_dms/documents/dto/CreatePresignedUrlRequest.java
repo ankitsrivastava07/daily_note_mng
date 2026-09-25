@@ -5,7 +5,7 @@ public record CreatePresignedUrlRequest(
         String fileName,
         String contentType,
         Long size,
-        String noteId
+        String referenceId
 
 ) {
 }
