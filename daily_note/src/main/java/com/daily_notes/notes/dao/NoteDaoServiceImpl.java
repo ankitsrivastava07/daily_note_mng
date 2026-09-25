@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
@@ -20,7 +21,7 @@ public class NoteDaoServiceImpl implements NoteDaoService {
     public NoteDaoServiceImpl(DynamoDbEnhancedClient enhancedClient) {
         this.dynamoDbTable = enhancedClient.table(
                 "note",
-                software.amazon.awssdk.enhanced.dynamodb.TableSchema.fromBean(NoteEntity.class)
+                TableSchema.fromBean(NoteEntity.class)
         );
     }
 
