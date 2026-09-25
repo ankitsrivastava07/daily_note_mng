@@ -113,3 +113,147 @@
         padding: 25px 20px;
     }
 }
+
+
+
+
+/* =========================================================
+   RICH DESCRIPTION EDITOR
+   ========================================================= */
+
+.description-rich-editor {
+    width: 100%;
+    min-height: 220px;
+    max-height: 600px;
+
+    box-sizing: border-box;
+
+    padding: 14px;
+
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+
+    background: #ffffff;
+
+    font-size: 14px;
+    line-height: 1.6;
+
+    outline: none;
+
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    cursor: text;
+}
+
+.description-rich-editor:focus {
+    border-color: #6366f1;
+}
+
+
+/* Placeholder */
+
+.description-rich-editor:empty::before {
+    content: attr(data-placeholder);
+
+    color: #9ca3af;
+
+    pointer-events: none;
+}
+
+
+/* =========================================================
+   PASTED IMAGE
+   ========================================================= */
+
+.description-rich-editor img {
+    display: block !important;
+
+    width: auto !important;
+    height: auto !important;
+
+    max-width: 100% !important;
+    max-height: 450px !important;
+
+    margin: 14px 0 !important;
+
+    object-fit: contain;
+
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+}
+
+
+.description-rich-editor img.description-pasted-image {
+    display: block !important;
+
+    max-width: 100% !important;
+    max-height: 450px !important;
+
+    width: auto !important;
+    height: auto !important;
+}
+
+
+/* Uploading image */
+
+.description-pasted-image[data-uploading="true"] {
+    opacity: 0.65;
+}
+
+
+/* Failed upload */
+
+.description-pasted-image[data-upload-failed="true"] {
+    opacity: 0.5;
+    border: 2px solid red;
+}
+
+
+/* =========================================================
+   HELP
+   ========================================================= */
+
+.description-help {
+    margin-top: 6px;
+
+    font-size: 12px;
+
+    color: #6b7280;
+}
+
+
+/* =========================================================
+   UPLOAD STATUS
+   ========================================================= */
+
+.image-uploading {
+    margin-top: 8px;
+
+    font-size: 13px;
+    font-weight: 500;
+
+    color: #4f46e5;
+}
+
+
+
+.description-rich-editor img,
+.description-rich-editor img:focus,
+.description-rich-editor img:active {
+    outline: none !important;
+    box-shadow: none !important;
+
+    border: none !important;
+
+    -webkit-tap-highlight-color: transparent;
+}
+
+.description-pasted-image {
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}

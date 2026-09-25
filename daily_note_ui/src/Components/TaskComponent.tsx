@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
 import "./CSS/TaskComponent.css";
 
 function CreateTask() {
+
+    const editorRef = useRef(null);
 
     const [task, setTask] = useState({
         title: "",
@@ -19,276 +21,1032 @@ function CreateTask() {
     const [loading, setLoading] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
 
-    const userId = localStorage.getItem("userId") || "ankit0397";
+    const userId =
+        localStorage.getItem("userId") || "ankit0397";
 
-    // ---------------------------------------------------------
-    // Normal input change
-    // ---------------------------------------------------------
+
+    // =========================================================
+    // NORMAL FORM CHANGE
+    // =========================================================
+
     const handleChange = (e) => {
 
         const { name, value } = e.target;
 
-        setTask(prev => ({
+        setTask((prev) => ({
             ...prev,
-            [name]: value
+            [name]: value,
         }));
 
         setMessage("");
     };
 
 
-    // ---------------------------------------------------------
-    // Handle Ctrl + V image paste
-    // ---------------------------------------------------------
-    const handlePaste = async (e) => {
+    // =========================================================
+    // DESCRIPTION CHANGE
+    // =========================================================
 
-        const items = e.clipboardData?.items;
+    const handleDescriptionChange = () => {
 
-        if (!items) {
+        if (!editorRef.current) {
             return;
         }
 
-        const imageFiles = [];
+        setTask((prev) => ({
+            ...prev,
+            content: editorRef.current.innerHTML,
+        }));
 
-        for (const item of items) {
+        setMessage("");
+    };
 
-            if (item.type.startsWith("image/")) {
 
-                const file = item.getAsFile();
+    // =========================================================
+    // UPDATE EDITOR CONTENT
+    // =========================================================
 
-                if (file) {
-                    imageFiles.push(file);
-                }
-            }
+    const updateEditorContent = () => {
+
+        if (!editorRef.current) {
+            return;
         }
 
-        // No image -> allow normal text paste
+        const html =
+            editorRef.current.innerHTML;
+
+        setTask((prev) => ({
+            ...prev,
+            content: html,
+        }));
+    };
+
+
+    // =========================================================
+    // PASTE HANDLER
+    // =========================================================
+
+    const handleDescriptionPaste = (e) => {
+
+        const items =
+            Array.from(
+                e.clipboardData?.items || []
+            );
+
+        // Get all pasted images
+        const imageFiles =
+            items
+                .filter(
+                    (item) =>
+                        item.kind === "file" &&
+                        item.type?.startsWith("image/")
+                )
+                .map(
+                    (item) =>
+                        item.getAsFile()
+                )
+                .filter(Boolean);
+
+        // Normal text paste
         if (imageFiles.length === 0) {
             return;
         }
 
-        // Prevent browser from trying to paste image into textarea
         e.preventDefault();
 
-        for (const file of imageFiles) {
+        // =====================================================
+        // MAXIMUM 5 IMAGES
+        // =====================================================
 
-            await uploadImageToDms(file);
+        const availableSlots =
+            5 - attachments.length;
+
+        if (availableSlots <= 0) {
+
+            setMessage(
+                "Maximum 5 images are allowed."
+            );
+
+            return;
         }
+
+        if (
+            imageFiles.length >
+            availableSlots
+        ) {
+
+            setMessage(
+                `Maximum 5 images are allowed. You can add only ${availableSlots} more image(s).`
+            );
+
+            return;
+        }
+
+        console.log(
+            "PASTED IMAGES:",
+            imageFiles
+        );
+
+        imageFiles.forEach(
+            (imageFile) => {
+
+                insertImageIntoEditor(
+                    imageFile
+                );
+            }
+        );
     };
 
 
-    // ---------------------------------------------------------
-    // Upload pasted image to DMS
-    // ---------------------------------------------------------
-    const uploadImageToDms = async (file) => {
+    // =========================================================
+    // INSERT IMAGE INTO EDITOR
+    // =========================================================
 
-        let previewUrl = null;
+    const insertImageIntoEditor = (file) => {
 
-        try {
+        if (!editorRef.current) {
+            return;
+        }
 
-            setUploadingImage(true);
-            setMessage("Uploading pasted image...");
+        // =====================================================
+        // FILE VALIDATION
+        // =====================================================
 
-            // Validate file type
-            if (!file.type.startsWith("image/")) {
-                throw new Error("Only image files are allowed");
+        if (
+            !file ||
+            !file.type ||
+            !file.type.startsWith("image/")
+        ) {
+
+            setMessage(
+                "Only image files are supported"
+            );
+
+            return;
+        }
+
+
+        // =====================================================
+        // MAX FILE SIZE = 10 MB
+        // =====================================================
+
+        const MAX_FILE_SIZE =
+            10 * 1024 * 1024;
+
+        if (
+            file.size >
+            MAX_FILE_SIZE
+        ) {
+
+            setMessage(
+                "Image size must be less than 10 MB"
+            );
+
+            return;
+        }
+
+
+        // =====================================================
+        // TEMPORARY ID
+        // =====================================================
+
+        const tempId =
+            crypto.randomUUID();
+
+
+        // =====================================================
+        // FILE NAME
+        // =====================================================
+
+        const extension =
+            getFileExtension(
+                file.type
+            );
+
+        const fileName =
+            `pasted-${Date.now()}-${tempId}.${extension}`;
+
+
+        // =====================================================
+        // LOCAL BLOB PREVIEW
+        // =====================================================
+
+        const previewUrl =
+            URL.createObjectURL(
+                file
+            );
+
+
+        // =====================================================
+        // CREATE IMAGE ELEMENT
+        // =====================================================
+
+        const imageElement =
+            document.createElement(
+                "img"
+            );
+
+        imageElement.src =
+            previewUrl;
+
+        imageElement.alt =
+            fileName;
+
+        imageElement.className =
+            "description-pasted-image";
+
+
+        imageElement.setAttribute(
+            "contenteditable",
+            "false"
+        );
+
+
+        imageElement.setAttribute(
+            "data-temp-id",
+            tempId
+        );
+
+
+        imageElement.setAttribute(
+            "data-uploading",
+            "pending"
+        );
+
+
+        imageElement.setAttribute(
+            "data-preview-url",
+            previewUrl
+        );
+
+
+        imageElement.setAttribute(
+            "data-file-name",
+            fileName
+        );
+
+
+        imageElement.setAttribute(
+            "data-content-type",
+            file.type
+        );
+
+
+        // =====================================================
+        // INSERT AT CURRENT CURSOR POSITION
+        // =====================================================
+
+        const selection =
+            window.getSelection();
+
+        let insertedAtCursor =
+            false;
+
+
+        if (
+            selection &&
+            selection.rangeCount > 0
+        ) {
+
+            const range =
+                selection.getRangeAt(0);
+
+
+            if (
+                editorRef.current.contains(
+                    range.commonAncestorContainer
+                )
+            ) {
+
+                range.deleteContents();
+
+
+                range.insertNode(
+                    imageElement
+                );
+
+
+                insertedAtCursor =
+                    true;
+
+
+                // ---------------------------------------------
+                // ADD EDITABLE LINE AFTER IMAGE
+                // ---------------------------------------------
+
+                const newLine =
+                    document.createElement(
+                        "div"
+                    );
+
+                newLine.innerHTML =
+                    "<br>";
+
+
+                imageElement.after(
+                    newLine
+                );
+
+
+                // ---------------------------------------------
+                // MOVE CURSOR AFTER IMAGE
+                // ---------------------------------------------
+
+                const newRange =
+                    document.createRange();
+
+
+                newRange.setStart(
+                    newLine,
+                    0
+                );
+
+
+                newRange.collapse(
+                    true
+                );
+
+
+                selection.removeAllRanges();
+
+
+                selection.addRange(
+                    newRange
+                );
             }
+        }
 
-            // Example maximum 10 MB
-            const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
-            if (file.size > MAX_FILE_SIZE) {
-                throw new Error("Image must be smaller than 10 MB");
+        // =====================================================
+        // CURSOR POSITION NOT AVAILABLE
+        // =====================================================
+
+        if (!insertedAtCursor) {
+
+            editorRef.current.appendChild(
+                imageElement
+            );
+
+
+            const newLine =
+                document.createElement(
+                    "div"
+                );
+
+
+            newLine.innerHTML =
+                "<br>";
+
+
+            editorRef.current.appendChild(
+                newLine
+            );
+        }
+
+
+        // =====================================================
+        // SAVE ATTACHMENT
+        // =====================================================
+
+        setAttachments(
+            (prev) => {
+
+                // Protect against stale React state
+                if (prev.length >= 5) {
+
+                    imageElement.remove();
+
+                    URL.revokeObjectURL(
+                        previewUrl
+                    );
+
+                    setMessage(
+                        "Maximum 5 images are allowed."
+                    );
+
+                    return prev;
+                }
+
+
+                return [
+                    ...prev,
+                    {
+                        tempId,
+                        file,
+                        fileName,
+
+                        contentType:
+                            file.type,
+
+                        fileSize:
+                            file.size,
+
+                        previewUrl,
+                    },
+                ];
             }
+        );
 
-            // Browser screenshots sometimes have a generic name
-            const extension = getFileExtension(file.type);
 
-            const fileName =
-                file.name &&
-                file.name !== "image.png"
-                    ? file.name
-                    : `pasted-${Date.now()}.${extension}`;
+        // =====================================================
+        // UPDATE DESCRIPTION
+        // =====================================================
 
-            // Create local preview
-            previewUrl = URL.createObjectURL(file);
+        updateEditorContent();
 
-            // -------------------------------------------------
-            // STEP 1
-            // Ask DMS service for presigned upload URL
-            // -------------------------------------------------
 
-            const presignedResponse = await fetch(
-                `${import.meta.env.VITE_DMS_API_BASE_URL}/api/v1/dms/presigned-upload`,
+        editorRef.current.focus();
+
+
+        setMessage(
+            "Image added. It will upload after task creation."
+        );
+
+
+        console.log(
+            "IMAGE INSERTED:",
+            {
+                tempId,
+                fileName,
+                contentType:
+                    file.type,
+                fileSize:
+                    file.size,
+                previewUrl,
+            }
+        );
+    };
+
+
+    // =========================================================
+    // GET PRESIGNED URLS
+    //
+    // ONE API CALL FOR MAXIMUM 5 FILES
+    // =========================================================
+
+    const getPresignedUrls = async (
+        attachmentsToUpload,
+        referenceId
+    ) => {
+
+        if (
+            !attachmentsToUpload ||
+            attachmentsToUpload.length === 0
+        ) {
+            return [];
+        }
+
+
+        if (
+            attachmentsToUpload.length >
+            5
+        ) {
+
+            throw new Error(
+                "Maximum 5 files are allowed"
+            );
+        }
+
+
+        const dmsBaseUrl =
+            import.meta.env
+                .VITE_DMS_API_BASE_URL;
+
+
+        if (!dmsBaseUrl) {
+
+            throw new Error(
+                "VITE_DMS_API_BASE_URL is not configured"
+            );
+        }
+
+
+        // =====================================================
+        // GET FILE NAMES
+        // =====================================================
+
+        const fileNames =
+            attachmentsToUpload.map(
+                (attachment) =>
+                    attachment.fileName
+            );
+
+
+        // =====================================================
+        // QUERY PARAMETERS
+        //
+        // ?fileName=a.png&fileName=b.png
+        // =====================================================
+
+        const params =
+            new URLSearchParams();
+
+
+        fileNames.forEach(
+            (name) => {
+
+                params.append(
+                    "fileName",
+                    name
+                );
+            }
+        );
+
+
+        const presignedApiUrl =
+            `${dmsBaseUrl}/api/v1/${referenceId}/dms/presigned?${params.toString()}`;
+
+
+        console.log(
+            "PRESIGNED API URL:",
+            presignedApiUrl
+        );
+
+
+        // =====================================================
+        // CALL DMS
+        // =====================================================
+
+        const response =
+            await fetch(
+                presignedApiUrl,
                 {
-                    method: "POST",
+                    method: "GET",
 
                     headers: {
-                        "Content-Type": "application/json",
-                        "userId": userId
+                        userId:
+                            userId,
                     },
-
-                    body: JSON.stringify({
-                        userId: userId,
-                        fileName: fileName,
-                        contentType: file.type,
-                        fileSize: file.size
-                    })
                 }
             );
 
-            if (!presignedResponse.ok) {
 
-                const errorText = await presignedResponse.text();
+        if (!response.ok) {
+
+            const errorText =
+                await response.text();
+
+
+            console.error(
+                "PRESIGNED API ERROR:",
+                errorText
+            );
+
+
+            throw new Error(
+                "Unable to get presigned URLs"
+            );
+        }
+
+
+        const presignedResponse =
+            await response.json();
+
+
+        console.log(
+            "PRESIGNED RESPONSE:",
+            presignedResponse
+        );
+
+
+        if (
+            !presignedResponse.success ||
+            !presignedResponse.data
+        ) {
+
+            throw new Error(
+                presignedResponse.message ||
+                "Presigned URLs not returned"
+            );
+        }
+
+
+        const presignedUrls =
+            presignedResponse.data;
+
+
+        if (
+            !Array.isArray(
+                presignedUrls
+            )
+        ) {
+
+            throw new Error(
+                "Invalid presigned URL response. Expected array."
+            );
+        }
+
+
+        if (
+            presignedUrls.length !==
+            attachmentsToUpload.length
+        ) {
+
+            throw new Error(
+                "Presigned URL count does not match attachment count"
+            );
+        }
+
+
+        return presignedUrls;
+    };
+
+
+    // =========================================================
+    // UPLOAD ALL IMAGES
+    // =========================================================
+
+    const uploadImagesToDms = async (
+        attachmentsToUpload,
+        taskId
+    ) => {
+
+        if (
+            !attachmentsToUpload?.length
+        ) {
+            return [];
+        }
+
+
+        if (
+            attachmentsToUpload.length >
+            5
+        ) {
+
+            throw new Error(
+                "Maximum 5 files are allowed"
+            );
+        }
+
+
+        const referenceId =
+            taskId;
+
+
+        // =====================================================
+        // STEP 1
+        // GET PRESIGNED URLS
+        // =====================================================
+
+        const presignedUrls =
+            await getPresignedUrls(
+                attachmentsToUpload,
+                referenceId
+            );
+
+
+        if (
+            presignedUrls.length !==
+            attachmentsToUpload.length
+        ) {
+
+            throw new Error(
+                "Presigned URL count does not match attachment count"
+            );
+        }
+
+
+        // =====================================================
+        // STEP 2
+        // UPLOAD FILES TO S3
+        // =====================================================
+
+        const uploadedAttachments =
+            [];
+
+
+        for (
+            let index = 0;
+            index <
+            attachmentsToUpload.length;
+            index++
+        ) {
+
+            const attachment =
+                attachmentsToUpload[
+                    index
+                ];
+
+
+            const uploadUrl =
+                presignedUrls[
+                    index
+                ];
+
+
+            const {
+                file,
+                tempId,
+                fileName,
+                contentType,
+                fileSize,
+            } = attachment;
+
+
+            console.log(
+                "UPLOADING TO S3:",
+                {
+                    referenceId,
+                    fileName,
+                    contentType,
+                    fileSize,
+                }
+            );
+
+
+            // =================================================
+            // PUT DIRECTLY TO S3
+            // =================================================
+
+            const uploadResponse =
+                await fetch(
+                    uploadUrl,
+                    {
+                        method:
+                            "PUT",
+
+                        headers: {
+                            "Content-Type":
+                                contentType,
+                        },
+
+                        body:
+                            file,
+                    }
+                );
+
+
+            if (
+                !uploadResponse.ok
+            ) {
+
+                const errorText =
+                    await uploadResponse
+                        .text();
+
 
                 console.error(
-                    "Presigned URL Error:",
+                    "S3 UPLOAD FAILED:",
+                    fileName,
                     errorText
                 );
 
+
                 throw new Error(
-                    "Unable to generate upload URL"
+                    `Unable to upload ${fileName} to S3`
                 );
             }
 
-            const presignedData =
-                await presignedResponse.json();
 
             console.log(
-                "DMS Presigned Response:",
-                presignedData
+                "S3 UPLOAD SUCCESS:",
+                fileName
             );
 
-            /*
-             * Expected response:
-             *
-             * {
-             *    "documentId": "abc-123",
-             *    "uploadUrl": "https://bucket.s3.amazonaws.com/...",
-             *    "key": "dms/ankit0397/abc-123.png"
-             * }
-             */
 
-
-            // -------------------------------------------------
-            // STEP 2
-            // Upload actual image directly to S3
-            // -------------------------------------------------
-
-            const uploadResponse = await fetch(
-                presignedData.uploadUrl,
+            uploadedAttachments.push(
                 {
-                    method: "PUT",
+                    tempId,
+                    referenceId,
+                    fileName,
+                    contentType,
+                    fileSize,
+                }
+            );
+        }
+
+
+        // =====================================================
+        // STEP 3
+        // SAVE DOCUMENT METADATA
+        // =====================================================
+
+        await saveDocumentMetadata(
+            referenceId,
+            uploadedAttachments
+        );
+
+
+        // =====================================================
+        // STEP 4
+        // UPDATE LOCAL EDITOR
+        // =====================================================
+
+        uploadedAttachments.forEach(
+            (uploaded) => {
+
+                updateImageAfterUpload(
+                    uploaded
+                );
+            }
+        );
+
+
+        return uploadedAttachments;
+    };
+
+
+    // =========================================================
+    // SAVE DOCUMENT METADATA
+    // =========================================================
+
+    const saveDocumentMetadata = async (
+        referenceId,
+        uploadedAttachments
+    ) => {
+
+        const dmsBaseUrl =
+            import.meta.env
+                .VITE_DMS_API_BASE_URL;
+
+
+        if (!dmsBaseUrl) {
+
+            throw new Error(
+                "VITE_DMS_API_BASE_URL is not configured"
+            );
+        }
+
+
+        // =====================================================
+        // BUILD List<DocumentDto>
+        // =====================================================
+
+        const documentDtos =
+            uploadedAttachments.map(
+                (attachment) => ({
+                    fileName:
+                        attachment.fileName,
+
+                    contentType:
+                        attachment.contentType,
+
+                    fileSize:
+                        attachment.fileSize,
+                })
+            );
+
+
+        console.log(
+            "SAVE DOCUMENT METADATA REQUEST:",
+            documentDtos
+        );
+
+
+        // =====================================================
+        // POST /api/v1/{referenceId}/dms
+        // =====================================================
+
+        const response =
+            await fetch(
+                `${dmsBaseUrl}/api/v1/${referenceId}/dms`,
+                {
+                    method:
+                        "POST",
 
                     headers: {
-                        "Content-Type": file.type
+
+                        "Content-Type":
+                            "application/json",
+
+                        userId:
+                            userId,
                     },
 
-                    body: file
+                    body:
+                        JSON.stringify(
+                            documentDtos
+                        ),
                 }
             );
 
-            if (!uploadResponse.ok) {
 
-                throw new Error(
-                    "Unable to upload image to S3"
-                );
-            }
+        if (!response.ok) {
 
-            console.log(
-                "Image uploaded successfully:",
-                presignedData.key
-            );
+            const errorText =
+                await response.text();
 
-
-            // -------------------------------------------------
-            // STEP 3
-            // Save only DMS metadata
-            // -------------------------------------------------
-
-            const attachment = {
-
-                documentId:
-                    presignedData.documentId,
-
-                key:
-                    presignedData.key,
-
-                fileName:
-                    fileName,
-
-                contentType:
-                    file.type,
-
-                fileSize:
-                    file.size,
-
-                previewUrl:
-                    previewUrl
-            };
-
-
-            setAttachments(prev => [
-                ...prev,
-                attachment
-            ]);
-
-
-            setMessage(
-                "Image attached successfully"
-            );
-
-        } catch (error) {
 
             console.error(
-                "DMS Image Upload Error:",
-                error
+                "SAVE DOCUMENT METADATA ERROR:",
+                errorText
             );
 
-            if (previewUrl) {
-                URL.revokeObjectURL(previewUrl);
-            }
 
-            setMessage(
-                error.message ||
-                "Unable to upload pasted image"
+            throw new Error(
+                "Files uploaded to S3, but document metadata could not be saved"
             );
-
-        } finally {
-
-            setUploadingImage(false);
         }
-    };
 
 
-    // ---------------------------------------------------------
-    // Remove attachment
-    // ---------------------------------------------------------
-    const removeAttachment = (index) => {
+        const result =
+            await response.json();
 
-        setAttachments(prev => {
 
-            const attachment = prev[index];
+        console.log(
+            "DOCUMENT METADATA SAVED:",
+            result
+        );
 
-            if (attachment?.previewUrl) {
-                URL.revokeObjectURL(
-                    attachment.previewUrl
-                );
-            }
 
-            return prev.filter(
-                (_, i) => i !== index
+        if (
+            result.success === false
+        ) {
+
+            throw new Error(
+                result.message ||
+                "Document metadata could not be saved"
             );
-        });
+        }
+
+
+        return result;
     };
 
 
-    // ---------------------------------------------------------
-    // Get extension from MIME type
-    // ---------------------------------------------------------
-    const getFileExtension = (contentType) => {
+    // =========================================================
+    // UPDATE LOCAL IMAGE AFTER UPLOAD
+    // =========================================================
 
-        switch (contentType) {
+    const updateImageAfterUpload = (
+        uploaded
+    ) => {
+
+        if (!editorRef.current) {
+            return;
+        }
+
+
+        const imageElement =
+            editorRef.current
+                .querySelector(
+                    `img[data-temp-id="${uploaded.tempId}"]`
+                );
+
+
+        if (!imageElement) {
+
+            console.warn(
+                "IMAGE ELEMENT NOT FOUND:",
+                uploaded.tempId
+            );
+
+            return;
+        }
+
+
+        if (
+            uploaded.referenceId
+        ) {
+
+            imageElement.setAttribute(
+                "data-reference-id",
+                uploaded.referenceId
+            );
+        }
+
+
+        imageElement.setAttribute(
+            "data-file-name",
+            uploaded.fileName
+        );
+
+
+        imageElement.setAttribute(
+            "data-content-type",
+            uploaded.contentType
+        );
+
+
+        imageElement.removeAttribute(
+            "data-temp-id"
+        );
+
+
+        imageElement.removeAttribute(
+            "data-uploading"
+        );
+
+
+        imageElement.removeAttribute(
+            "data-upload-failed"
+        );
+
+
+        updateEditorContent();
+    };
+
+
+    // =========================================================
+    // FILE EXTENSION
+    // =========================================================
+
+    const getFileExtension = (
+        contentType
+    ) => {
+
+        switch (
+            contentType
+        ) {
 
             case "image/jpeg":
                 return "jpg";
@@ -309,18 +1067,121 @@ function CreateTask() {
     };
 
 
-    // ---------------------------------------------------------
-    // Submit Task
-    // ---------------------------------------------------------
-    const handleSubmit = async (e) => {
+    // =========================================================
+    // DESCRIPTION VALIDATION
+    // =========================================================
+
+    const hasDescriptionContent = () => {
+
+        if (!editorRef.current) {
+            return false;
+        }
+
+
+        const text =
+            editorRef.current
+                .innerText
+                .trim();
+
+
+        const images =
+            editorRef.current
+                .querySelectorAll(
+                    "img"
+                );
+
+
+        return (
+            text.length > 0 ||
+            images.length > 0
+        );
+    };
+
+
+    // =========================================================
+    // GET INITIAL DESCRIPTION
+    //
+    // REMOVE LOCAL BLOB URL BEFORE SAVING TASK
+    // =========================================================
+
+    const getInitialDescriptionHtml = () => {
+
+        if (!editorRef.current) {
+            return "";
+        }
+
+
+        const clone =
+            editorRef.current
+                .cloneNode(true);
+
+
+        const images =
+            clone.querySelectorAll(
+                "img"
+            );
+
+
+        images.forEach(
+            (image) => {
+
+                // Local blob URL must NOT
+                // be stored in DynamoDB
+
+                image.removeAttribute(
+                    "src"
+                );
+
+
+                image.removeAttribute(
+                    "data-preview-url"
+                );
+
+
+                image.removeAttribute(
+                    "data-temp-id"
+                );
+
+
+                image.removeAttribute(
+                    "data-uploading"
+                );
+
+
+                image.removeAttribute(
+                    "data-upload-failed"
+                );
+
+
+                image.removeAttribute(
+                    "contenteditable"
+                );
+            }
+        );
+
+
+        return clone.innerHTML;
+    };
+
+
+    // =========================================================
+    // CREATE TASK
+    // =========================================================
+
+    const handleSubmit = async (
+        e
+    ) => {
 
         e.preventDefault();
 
-        // ---------------------------------------------
-        // Validation
-        // ---------------------------------------------
 
-        if (!task.name.trim()) {
+        // =====================================================
+        // VALIDATION
+        // =====================================================
+
+        if (
+            !task.name.trim()
+        ) {
 
             setMessage(
                 "Task title is required"
@@ -329,43 +1190,10 @@ function CreateTask() {
             return;
         }
 
-        if (!task.dueDate) {
 
-            setMessage(
-                "Due date is required"
-            );
-
-            return;
-        }
-
-        if (!task.dueTime) {
-
-            setMessage(
-                "Due time is required"
-            );
-
-            return;
-        }
-
-        if (!task.priority) {
-
-            setMessage(
-                "Priority is required"
-            );
-
-            return;
-        }
-
-        if (!task.status) {
-
-            setMessage(
-                "Status is required"
-            );
-
-            return;
-        }
-
-        if (!task.content.trim()) {
+        if (
+            !hasDescriptionContent()
+        ) {
 
             setMessage(
                 "Description is required"
@@ -374,11 +1202,62 @@ function CreateTask() {
             return;
         }
 
-        // Don't create task while image is uploading
-        if (uploadingImage) {
+
+        if (
+            !task.dueDate
+        ) {
 
             setMessage(
-                "Please wait for image upload to complete"
+                "Due date is required"
+            );
+
+            return;
+        }
+
+
+        if (
+            !task.dueTime
+        ) {
+
+            setMessage(
+                "Due time is required"
+            );
+
+            return;
+        }
+
+
+        if (
+            !task.priority
+        ) {
+
+            setMessage(
+                "Priority is required"
+            );
+
+            return;
+        }
+
+
+        if (
+            !task.status
+        ) {
+
+            setMessage(
+                "Status is required"
+            );
+
+            return;
+        }
+
+
+        if (
+            attachments.length >
+            5
+        ) {
+
+            setMessage(
+                "Maximum 5 images are allowed"
             );
 
             return;
@@ -387,78 +1266,68 @@ function CreateTask() {
 
         try {
 
-            setLoading(true);
-
-            setMessage("");
-
-
-            // ---------------------------------------------
-            // Remove previewUrl before sending backend
-            // ---------------------------------------------
-
-            const attachmentRequest =
-                attachments.map(attachment => ({
-
-                    documentId:
-                        attachment.documentId,
-
-                    key:
-                        attachment.key,
-
-                    fileName:
-                        attachment.fileName,
-
-                    contentType:
-                        attachment.contentType,
-
-                    fileSize:
-                        attachment.fileSize
-                }));
+            setLoading(
+                true
+            );
 
 
-            // ---------------------------------------------
-            // Final Task Request
-            // ---------------------------------------------
+            setMessage(
+                "Creating task..."
+            );
 
-            const requestBody = {
+
+            // =================================================
+            // STEP 1
+            // CREATE TASK
+            // =================================================
+
+            const initialDescription =
+                getInitialDescriptionHtml();
+
+
+            const createRequest = {
 
                 ...task,
 
-                userId: userId,
+                content:
+                    initialDescription,
+
+                userId:
+                    userId,
 
                 attachments:
-                    attachmentRequest
+                    [],
             };
 
 
             console.log(
-                "Create Task Request:",
-                requestBody
+                "CREATE TASK REQUEST:",
+                createRequest
             );
 
 
-            const response = await fetch(
+            const response =
+                await fetch(
+                    `${import.meta.env.VITE_API_BASE_URL}/api/v1/user/${userId}/task`,
+                    {
+                        method:
+                            "POST",
 
-                `${import.meta.env.VITE_API_BASE_URL}/api/v1/user/${userId}/task`,
+                        headers: {
 
-                {
-                    method: "POST",
+                            "Content-Type":
+                                "application/json",
 
-                    headers: {
+                            userId:
+                                userId,
+                        },
 
-                        "Content-Type":
-                            "application/json",
-
-                        "userId":
-                            userId
-                    },
-
-                    body:
-                        JSON.stringify(
-                            requestBody
-                        )
-                }
-            );
+                        body:
+                            JSON.stringify(
+                                createRequest
+                            ),
+                    }
+                );
 
 
             if (!response.ok) {
@@ -466,10 +1335,12 @@ function CreateTask() {
                 const errorText =
                     await response.text();
 
+
                 console.error(
-                    "Create Task Error:",
+                    "CREATE TASK ERROR:",
                     errorText
                 );
+
 
                 throw new Error(
                     "Failed to create task"
@@ -477,101 +1348,201 @@ function CreateTask() {
             }
 
 
+            // =================================================
+            // STEP 2
+            // GET CREATED TASK
+            // =================================================
+
+            const createdTaskResponse =
+                await response.json();
+
+
+            console.log(
+                "CREATED TASK RESPONSE:",
+                createdTaskResponse
+            );
+
+
+            if (
+                !createdTaskResponse.success
+            ) {
+
+                throw new Error(
+                    createdTaskResponse.message ||
+                    "Task creation failed"
+                );
+            }
+
+
+            if (
+                !createdTaskResponse
+                    .data?.id
+            ) {
+
+                throw new Error(
+                    "Task created but taskId was not returned"
+                );
+            }
+
+
+            const taskId =
+                createdTaskResponse
+                    .data
+                    .id;
+
+
+            console.log(
+                "TASK ID:",
+                taskId
+            );
+
+
+            // =================================================
+            // STEP 3
+            // UPLOAD IMAGES
+            // =================================================
+
+            let uploadedAttachments =
+                [];
+
+
+            if (
+                attachments.length >
+                0
+            ) {
+
+                setUploadingImage(
+                    true
+                );
+
+
+                setMessage(
+                    `Uploading ${attachments.length} image(s)...`
+                );
+
+
+                try {
+
+                    uploadedAttachments =
+                        await uploadImagesToDms(
+                            attachments,
+                            taskId
+                        );
+
+                } catch (
+                    uploadError
+                ) {
+
+                    console.error(
+                        "IMAGE UPLOAD FAILED:",
+                        uploadError
+                    );
+
+
+                    throw new Error(
+                        `Task created, but image upload failed: ${uploadError.message}`
+                    );
+                }
+            }
+
+
+            // =================================================
+            // SUCCESS
+            // =================================================
+
+            console.log(
+                "TASK + DMS COMPLETED:",
+                {
+                    taskId,
+                    uploadedAttachments,
+                }
+            );
+
+
             setMessage(
                 "Task created successfully"
             );
 
 
-            // ---------------------------------------------
-            // Clean preview URLs
-            // ---------------------------------------------
+            // =================================================
+            // CLEAN LOCAL BLOB URLs
+            // =================================================
 
             attachments.forEach(
-                attachment => {
+                (attachment) => {
 
                     if (
-                        attachment.previewUrl
+                        attachment
+                            .previewUrl
                     ) {
 
                         URL.revokeObjectURL(
-                            attachment.previewUrl
+                            attachment
+                                .previewUrl
                         );
                     }
                 }
             );
 
 
-            // ---------------------------------------------
-            // Reset Form
-            // ---------------------------------------------
+            // =================================================
+            // RESET FORM
+            // =================================================
 
             setTask({
-
                 title: "",
-
                 content: "",
-
-                priority:
-                    "MEDIUM",
-
+                priority: "MEDIUM",
                 dueDate: "",
-
                 dueTime: "",
-
-                status:
-                    "PENDING",
-
-                meridiem:
-                    "AM",
-
-                name: ""
+                status: "PENDING",
+                meridiem: "AM",
+                name: "",
             });
 
 
-            setAttachments([]);
+            setAttachments(
+                []
+            );
 
 
-        } catch (error) {
+            if (
+                editorRef.current
+            ) {
+
+                editorRef.current
+                    .innerHTML = "";
+            }
+
+
+        } catch (
+            error
+        ) {
 
             console.error(
-                "Create Task Error:",
+                "CREATE TASK FLOW ERROR:",
                 error
             );
 
+
             setMessage(
+                error.message ||
                 "Unable to create task"
             );
 
+
         } finally {
 
-            setLoading(false);
+            setLoading(
+                false
+            );
+
+
+            setUploadingImage(
+                false
+            );
         }
     };
-
-
-    // ---------------------------------------------------------
-    // Clean object URLs when component is destroyed
-    // ---------------------------------------------------------
-    useEffect(() => {
-
-        return () => {
-
-            attachments.forEach(
-                attachment => {
-
-                    if (
-                        attachment.previewUrl
-                    ) {
-
-                        URL.revokeObjectURL(
-                            attachment.previewUrl
-                        );
-                    }
-                }
-            );
-        };
-
-    }, []);
 
 
     // =========================================================
@@ -583,9 +1554,6 @@ function CreateTask() {
         <div className="create-task-page">
 
             <div className="task-form-card">
-
-
-                {/* Header */}
 
                 <div className="task-form-header">
 
@@ -600,167 +1568,124 @@ function CreateTask() {
                 </div>
 
 
-                <form onSubmit={handleSubmit}>
+                <form
+                    onSubmit={
+                        handleSubmit
+                    }
+                >
 
-
-                    {/* Task Title */}
+                    {/* ===================================== */}
+                    {/* TASK TITLE */}
+                    {/* ===================================== */}
 
                     <div className="form-group">
 
                         <label>
-
-                            Task Title
+                            Task Title{" "}
 
                             <span className="required">
                                 *
                             </span>
-
                         </label>
 
 
                         <input
-
                             type="text"
-
                             name="name"
-
                             placeholder="Enter task title"
-
-                            value={task.name}
-
-                            onChange={handleChange}
-
+                            value={
+                                task.name
+                            }
+                            onChange={
+                                handleChange
+                            }
                             required
+                            disabled={
+                                loading
+                            }
                         />
 
                     </div>
 
 
-                    {/* Description */}
+                    {/* ===================================== */}
+                    {/* DESCRIPTION */}
+                    {/* ===================================== */}
 
                     <div className="form-group">
 
                         <label>
-                            Description
+                            Description{" "}
+
+                            <span className="required">
+                                *
+                            </span>
                         </label>
 
 
-                        <textarea
-
-                            name="content"
-
-                            placeholder="Enter task description or paste screenshot here using Ctrl + V"
-
-                            rows="6"
-
-                            value={task.content}
-
-                            onChange={handleChange}
-
-                            onPaste={handlePaste}
-
+                        <div
+                            ref={
+                                editorRef
+                            }
+                            className="description-rich-editor"
+                            contentEditable={
+                                !loading
+                            }
+                            suppressContentEditableWarning={
+                                true
+                            }
+                            data-placeholder="Type description or paste screenshot using Ctrl + V"
+                            onInput={
+                                handleDescriptionChange
+                            }
+                            onPaste={
+                                handleDescriptionPaste
+                            }
                         />
 
 
-                        <div className="paste-image-hint">
+                        <div className="description-help">
 
-                            You can paste screenshots directly using
-                            {" "}
+                            Type text and paste screenshots using{" "}
+
                             <strong>
                                 Ctrl + V
                             </strong>
 
+                            {" "}
+
+                            <span>
+                                ({attachments.length}/5)
+                            </span>
+
                         </div>
 
 
-                        {/* Uploading */}
+                        {
+                            uploadingImage && (
 
-                        {uploadingImage && (
+                                <div className="image-uploading">
 
-                            <div className="image-uploading">
+                                    Uploading{" "}
 
-                                Uploading image...
+                                    {
+                                        attachments.length
+                                    }
 
-                            </div>
+                                    {" "}image(s) to DMS...
 
-                        )}
-
-
-                        {/* Image Preview */}
-
-                        {attachments.length > 0 && (
-
-                            <div className="attachment-preview">
-
-                                {attachments.map(
-                                    (attachment, index) => (
-
-                                        <div
-                                            key={`${attachment.documentId}-${index}`}
-                                            className="attachment-item"
-                                        >
-
-                                            <div className="image-preview-wrapper">
-
-                                                <img
-
-                                                    src={
-                                                        attachment.previewUrl
-                                                    }
-
-                                                    alt={
-                                                        attachment.fileName
-                                                    }
-
-                                                    className="pasted-image-preview"
-
-                                                />
-
-
-                                                <button
-
-                                                    type="button"
-
-                                                    className="remove-attachment-button"
-
-                                                    onClick={() =>
-                                                        removeAttachment(index)
-                                                    }
-
-                                                    title="Remove image"
-                                                >
-
-                                                    ×
-
-                                                </button>
-
-                                            </div>
-
-
-                                            <span className="attachment-name">
-
-                                                {
-                                                    attachment.fileName
-                                                }
-
-                                            </span>
-
-                                        </div>
-
-                                    )
-                                )}
-
-                            </div>
-
-                        )}
+                                </div>
+                            )
+                        }
 
                     </div>
 
 
-                    {/* Priority + Status */}
+                    {/* ===================================== */}
+                    {/* PRIORITY + STATUS */}
+                    {/* ===================================== */}
 
                     <div className="form-row">
-
 
                         <div className="form-group">
 
@@ -770,15 +1695,15 @@ function CreateTask() {
 
 
                             <select
-
                                 name="priority"
-
                                 value={
                                     task.priority
                                 }
-
                                 onChange={
                                     handleChange
+                                }
+                                disabled={
+                                    loading
                                 }
                             >
 
@@ -807,15 +1732,15 @@ function CreateTask() {
 
 
                             <select
-
                                 name="status"
-
                                 value={
                                     task.status
                                 }
-
                                 onChange={
                                     handleChange
+                                }
+                                disabled={
+                                    loading
                                 }
                             >
 
@@ -838,16 +1763,17 @@ function CreateTask() {
                     </div>
 
 
-                    {/* Due Date + Time */}
+                    {/* ===================================== */}
+                    {/* DATE + TIME */}
+                    {/* ===================================== */}
 
                     <div className="form-row">
-
 
                         <div className="form-group">
 
                             <label>
 
-                                Due Date
+                                Due Date{" "}
 
                                 <span className="required">
                                     *
@@ -857,20 +1783,18 @@ function CreateTask() {
 
 
                             <input
-
                                 type="date"
-
                                 name="dueDate"
-
                                 value={
                                     task.dueDate
                                 }
-
                                 onChange={
                                     handleChange
                                 }
-
                                 required
+                                disabled={
+                                    loading
+                                }
                             />
 
                         </div>
@@ -880,7 +1804,7 @@ function CreateTask() {
 
                             <label>
 
-                                Due Time
+                                Due Time{" "}
 
                                 <span className="required">
                                     *
@@ -890,20 +1814,18 @@ function CreateTask() {
 
 
                             <input
-
                                 type="time"
-
                                 name="dueTime"
-
                                 value={
                                     task.dueTime
                                 }
-
                                 onChange={
                                     handleChange
                                 }
-
                                 required
+                                disabled={
+                                    loading
+                                }
                             />
 
                         </div>
@@ -911,14 +1833,13 @@ function CreateTask() {
                     </div>
 
 
-                    {/* Create Button */}
+                    {/* ===================================== */}
+                    {/* CREATE BUTTON */}
+                    {/* ===================================== */}
 
                     <button
-
                         type="submit"
-
                         className="create-task-button"
-
                         disabled={
                             loading ||
                             uploadingImage
@@ -927,26 +1848,33 @@ function CreateTask() {
 
                         {
                             uploadingImage
-                                ? "Uploading Image..."
+
+                                ? "Uploading Images..."
+
                                 : loading
+
                                     ? "Creating..."
+
                                     : "Create Task"
                         }
 
                     </button>
 
 
-                    {/* Message */}
+                    {/* ===================================== */}
+                    {/* MESSAGE */}
+                    {/* ===================================== */}
 
-                    {message && (
+                    {
+                        message && (
 
-                        <div className="task-message">
+                            <div className="task-message">
 
-                            {message}
+                                {message}
 
-                        </div>
-
-                    )}
+                            </div>
+                        )
+                    }
 
                 </form>
 
