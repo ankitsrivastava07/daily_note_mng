@@ -1,8 +1,12 @@
 # Stage 1: Build the JAR with Maven
 FROM maven:3.9.6-eclipse-temurin-17 AS builder
 WORKDIR /app
+
+# Copy pom.xml and all source files in the current context
 COPY pom.xml .
-COPY src ./src
+COPY . .
+
+# Build the application
 RUN mvn clean package -DskipTests
 
 # Stage 2: Create the runtime container
