@@ -1,14 +1,14 @@
-# Stage 1: Build stage
+# Stage 1: Build the JAR with Maven
 FROM maven:3.9.6-eclipse-temurin-17 AS builder
 WORKDIR /app
 
-# Copy the entire repo
+# Copy all repository files
 COPY . .
 
-# Run a standard Maven build
-RUN mvn clean package -DskipTests
+# Move into the subfolder containing pom.xml and build
+RUN cd search_event_consumer && mvn clean package -DskipTests
 
-# Stage 2: Runtime stage
+# Stage 2: Create the runtime container
 FROM eclipse-temurin:17-jdk
 WORKDIR /app
 
@@ -16,8 +16,8 @@ WORKDIR /app
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 \
     /lambda-adapter /opt/extensions/lambda-adapter
 
-# Copy the built JAR file (finds any jar in target or sub-target folders)
-COPY --from=builder /app/**/target/*.jar app.jar
+# Copy the generated JAR from the build stage
+COPY --from=builder /app/search_event_consumer/target/*.jar app.jar
 
 EXPOSE 9093
 
