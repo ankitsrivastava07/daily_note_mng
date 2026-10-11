@@ -26,10 +26,10 @@ public class ShortNoteController {
                 HttpStatus.CREATED);
     }
 
-    @GetMapping
+    @GetMapping(produces = "application/json")
     public ResponseEntity<?> getAllShortNotes(
             @RequestHeader("userId") String userId,
-            @RequestParam(defaultValue = "5") Integer limit,
+            @RequestParam(defaultValue = "10") Integer limit,
             @RequestHeader("categoryId") String categoryId) {
 
         var page = shortNoteService.getAllShortNotes(
