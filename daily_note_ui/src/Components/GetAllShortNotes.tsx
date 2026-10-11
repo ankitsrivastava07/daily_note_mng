@@ -119,14 +119,8 @@ function GetAllShortNotes() {
             <header className="short-note-header">
                 <div>
                     <h2>Short Notes</h2>
-                    <p className="short-note-subtitle">
-                        Your saved notes and interview preparation
-                    </p>
                 </div>
 
-                <span className="short-note-count">
-                    {shortNotes.length} loaded
-                </span>
             </header>
 
             {error && (

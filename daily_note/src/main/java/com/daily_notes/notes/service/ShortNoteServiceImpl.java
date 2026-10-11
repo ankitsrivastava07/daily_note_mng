@@ -36,23 +36,20 @@ public class ShortNoteServiceImpl implements ShortNoteService {
     }
 
     @Override
-    public ApiResponse getAllShortNotes(
+    public Page<ShortNoteEntity> getAllShortNotes(
             String categoryId1,
             String userId,
             Integer limit,
             Map<String, AttributeValue> attributeValueMap) {
 
-        Page<ShortNoteEntity> sdkPage =
+        Page<ShortNoteEntity> response =
                 shortNoteDao.getAllShortNotes(
                         userId,
                         limit,
                         attributeValueMap
                 );
 
-        return new ApiResponse()
-                .data(sdkPage.items())
-                .message("Success")
-                .success(Boolean.TRUE);
+        return response;
     }
 
     @Override

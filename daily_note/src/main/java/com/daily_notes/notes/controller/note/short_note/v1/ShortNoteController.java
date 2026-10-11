@@ -6,6 +6,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @RestController
 @RequestMapping("/api/v1/short-note")
 public class ShortNoteController {
@@ -24,11 +27,25 @@ public class ShortNoteController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllShortNotes(@RequestHeader String userId,
-                                              @RequestParam(defaultValue = "10") Integer limit,
-                                              @RequestHeader String categoryId) {
-        return new ResponseEntity<>(shortNoteService
-                .getAllShortNotes(categoryId, userId, limit, null), HttpStatus.OK);
+    public ResponseEntity<?> getAllShortNotes(
+            @RequestHeader("userId") String userId,
+            @RequestParam(defaultValue = "5") Integer limit,
+            @RequestHeader("categoryId") String categoryId) {
+
+        var page = shortNoteService.getAllShortNotes(
+                categoryId,
+                userId,
+                limit,
+                null
+        );
+
+        Map<String, Object> result = new HashMap<>();
+        result.put("items", page.items());
+        result.put("lastEvaluatedKey", null);
+
+        return ResponseEntity.ok(
+                Map.of("data", result)
+        );
     }
 
     @DeleteMapping

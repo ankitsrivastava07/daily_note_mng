@@ -1,4 +1,4 @@
-package com.daily_notes.notes.controller.back_fill.task;
+package com.daily_notes.notes.controller.back_fill;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

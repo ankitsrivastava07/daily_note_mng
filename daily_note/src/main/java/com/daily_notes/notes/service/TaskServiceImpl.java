@@ -50,7 +50,6 @@ public class TaskServiceImpl implements TaskService {
 
     @Override
     public ApiResponse createTask(TaskDto taskDto) {
-
         String userId = taskDto.userId();
         String taskId = UUID.randomUUID().toString();
         String eventId = UUID.randomUUID().toString();
@@ -76,6 +75,7 @@ public class TaskServiceImpl implements TaskService {
         event.setEventType("TASK_CREATED");
         event.setPayload(
                 CustomMapper.mapToJson(taskEntity)
+
         );
         event.setStatus("PENDING");
 
