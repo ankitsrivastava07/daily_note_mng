@@ -5,6 +5,9 @@ import com.daily_notes.notes.service.ShortNoteService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -28,20 +31,42 @@ public class ShortNoteController {
 
     @GetMapping(produces = "application/json")
     public ResponseEntity<?> getAllShortNotes(
-            @RequestHeader("userid") String userid,
+            @RequestHeader(value = "userId", required = false) String userIdHeader,
+            @RequestHeader(value = "userid", required = false) String userIdLower,
             @RequestParam(defaultValue = "10") Integer limit,
-            @RequestHeader("categoryid") String categoryid) {
+            @RequestHeader(value = "categoryId", required = false) String categoryIdHeader,
+            @RequestHeader(value = "categoryid", required = false) String categoryIdLower,
+            @RequestParam(required = false) String lastKey) { // <-- Accept lastKey query param
+
+        String userid = userIdHeader != null ? userIdHeader : userIdLower;
+        String categoryid = categoryIdHeader != null ? categoryIdHeader : categoryIdLower;
+
+        if (userid == null || userid.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Required header 'userId' is missing", "success", false));
+        }
+
+        // Parse lastKey JSON string back into DynamoDB AttributeValue map if present
+        Map<String, AttributeValue> decodedKey = null;
+        if (lastKey != null && !lastKey.isEmpty()) {
+            try {
+                decodedKey = new ObjectMapper().readValue(lastKey, new TypeReference<Map<String, AttributeValue>>() {
+                });
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Invalid lastKey format", "success", false));
+            }
+        }
 
         var page = shortNoteService.getAllShortNotes(
                 categoryid,
                 userid,
                 limit,
-                null
+                decodedKey // <-- Pass the decoded pagination key here
         );
 
         Map<String, Object> result = new HashMap<>();
         result.put("items", page.items());
-        result.put("lastEvaluatedKey", null);
+        // Return the next evaluation key so the frontend can request the following page
+        result.put("lastEvaluatedKey", page.lastEvaluatedKey());
 
         return ResponseEntity.ok(
                 Map.of("data", result)
