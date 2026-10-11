@@ -74,11 +74,11 @@ function CreateShortNote() {
 
         console.log("Form Submitted Successfully!", inputValue);
 
-        fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/short-note`, {
+       fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/short-note`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "userId": "ankit0397"
+                "userId": "ankit0397",
             },
             body: JSON.stringify(inputValue),
         })
