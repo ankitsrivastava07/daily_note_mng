@@ -38,8 +38,8 @@ function GetAllShortNotes() {
             const response = await fetch(url.toString(), {
                 method: "GET",
                 headers: {
-                    userid: userId,
-                    categoryid: "hgfhgf",
+                    userId: userId,
+                    categoryId: "hgfhgf",
                     Accept: "application/json",
                 },
             });
