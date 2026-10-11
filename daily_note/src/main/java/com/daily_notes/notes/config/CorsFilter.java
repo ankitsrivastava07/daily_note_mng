@@ -1,3 +1,4 @@
+/*
 package com.daily_notes.notes.config;
 
 import jakarta.servlet.FilterChain;
@@ -56,3 +57,4 @@ public class CorsFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 }
+*/
