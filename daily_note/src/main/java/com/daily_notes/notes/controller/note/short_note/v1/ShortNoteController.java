@@ -2,6 +2,8 @@ package com.daily_notes.notes.controller.note.short_note.v1;
 
 import com.daily_notes.notes.dto.CreateShortNoteDto;
 import com.daily_notes.notes.service.ShortNoteService;
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,21 +33,23 @@ public class ShortNoteController {
 
     @GetMapping(produces = "application/json")
     public ResponseEntity<?> getAllShortNotes(
-            @RequestHeader(value = "userId", required = false) String userIdHeader,
-            @RequestHeader(value = "userid", required = false) String userIdLower,
+            HttpServletRequest request,
             @RequestParam(defaultValue = "10") Integer limit,
-            @RequestHeader(value = "categoryId", required = false) String categoryIdHeader,
-            @RequestHeader(value = "categoryid", required = false) String categoryIdLower,
-            @RequestParam(required = false) String lastKey) { // <-- Accept lastKey query param
+            @RequestParam(required = false) String lastKey) {
 
-        String userid = userIdHeader != null ? userIdHeader : userIdLower;
-        String categoryid = categoryIdHeader != null ? categoryIdHeader : categoryIdLower;
+        // Check all common casing variants sent by browsers or gateways
+        String userid = request.getHeader("userId");
+        if (userid == null) userid = request.getHeader("userid");
+        if (userid == null) userid = request.getHeader("Userid");
 
         if (userid == null || userid.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Required header 'userId' is missing", "success", false));
+            return ResponseEntity.badRequest().body(Map.of("message", "Required header 'userid' is missing", "success", false));
         }
 
-        // Parse lastKey JSON string back into DynamoDB AttributeValue map if present
+        String categoryid = request.getHeader("categoryId");
+        if (categoryid == null) categoryid = request.getHeader("categoryid");
+        if (categoryid == null) categoryid = request.getHeader("Categoryid");
+
         Map<String, AttributeValue> decodedKey = null;
         if (lastKey != null && !lastKey.isEmpty()) {
             try {
@@ -57,20 +61,27 @@ public class ShortNoteController {
         }
 
         var page = shortNoteService.getAllShortNotes(
-                categoryid,
+                categoryid != null ? categoryid : "hgfhgf",
                 userid,
                 limit,
-                decodedKey // <-- Pass the decoded pagination key here
+                decodedKey
         );
 
         Map<String, Object> result = new HashMap<>();
         result.put("items", page.items());
-        // Return the next evaluation key so the frontend can request the following page
         result.put("lastEvaluatedKey", page.lastEvaluatedKey());
 
-        return ResponseEntity.ok(
-                Map.of("data", result)
-        );
+        return ResponseEntity.ok(Map.of("data", result));
+    }
+
+    // Helper method for case-insensitive header checking
+    private String getHeaderIgnoreCase(HttpHeaders headers, String targetKey) {
+        for (Map.Entry<String, java.util.List<String>> entry : headers.entrySet()) {
+            if (entry.getKey().equalsIgnoreCase(targetKey) && entry.getValue() != null && !entry.getValue().isEmpty()) {
+                return entry.getValue().get(0);
+            }
+        }
+        return null;
     }
 
     @DeleteMapping

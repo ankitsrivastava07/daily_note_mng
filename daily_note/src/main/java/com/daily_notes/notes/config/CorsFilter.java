@@ -1,16 +1,15 @@
-/*
 package com.daily_notes.notes.config;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.context.annotation.Configuration;
+import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-@Configuration
+@Component
 public class CorsFilter extends OncePerRequestFilter {
 
     @Override
@@ -23,7 +22,7 @@ public class CorsFilter extends OncePerRequestFilter {
         String origin = request.getHeader("Origin");
 
         if ("http://localhost:5173".equals(origin)
-                || "https://main.d1dpqtfgo1oh1y.amplifyapp.com".equals(origin)) {
+                || "https://daily-note-mng.vercel.app".equals(origin)) {
 
             response.setHeader("Access-Control-Allow-Origin", origin);
         }
@@ -35,7 +34,7 @@ public class CorsFilter extends OncePerRequestFilter {
 
         response.setHeader(
                 "Access-Control-Allow-Headers",
-                "Content-Type, Authorization, userId, X-Request-Id, userid, categoryid"
+                "Content-Type, Authorization, userId, X-Request-Id, userid, categoryid, Userid, Categoryid"
         );
 
         response.setHeader(
@@ -57,4 +56,3 @@ public class CorsFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 }
-*/
