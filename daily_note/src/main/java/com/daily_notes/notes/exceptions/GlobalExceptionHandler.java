@@ -1,6 +1,8 @@
 package com.daily_notes.notes.exceptions;
 
 import com.daily_notes.notes.dto.ErrorResponse;
+import com.daily_notes.notes.exceptions.exception.DynamoDbIndexUnavailableException;
+import com.daily_notes.notes.exceptions.exception.ShortEntityAlreadyExistException;
 import com.daily_notes.notes.records.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +17,9 @@ import software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @ControllerAdvice
 public class GlobalExceptionHandler {
     private final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
@@ -28,35 +33,45 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingRequestHeaderException.class)
     public ResponseEntity<?> handleMissingRequestHeaderException(MissingRequestHeaderException exp) {
         logger.info("Missing Request Header Exception Occurred {}", exp.getMessage());
-        return new ResponseEntity<>(new ApiResponse().message(exp.getLocalizedMessage()).success(Boolean.FALSE),
-                HttpStatus.BAD_REQUEST);
+        return new ResponseEntity<>(new ApiResponse().message(exp.getLocalizedMessage()).success(Boolean.FALSE), HttpStatus.BAD_REQUEST);
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<?> handleNoResourceFoundException(NoResourceFoundException exp) {
         logger.info("No Resource Found Exception Occurred {}", exp.getMessage());
-        return new ResponseEntity<>(new ApiResponse().message(exp.getLocalizedMessage()).success(Boolean.FALSE),
-                HttpStatus.NOT_FOUND);
+        return new ResponseEntity<>(new ApiResponse().message(exp.getLocalizedMessage()).success(Boolean.FALSE), HttpStatus.NOT_FOUND);
     }
 
-    @ExceptionHandler({
-            ApiCallAttemptTimeoutException.class,
-            ApiCallTimeoutException.class
-    })
+    @ExceptionHandler({ApiCallAttemptTimeoutException.class, ApiCallTimeoutException.class})
     public ResponseEntity<?> handleDatabaseTimeoutException(SdkClientException exception) {
         logger.info("Database Timeout Exception Occurred {}", exception.getMessage());
-        return new ResponseEntity<>(new ApiResponse()
-                .message("Database Request Timeout. Please try again.")
-                .success(Boolean.FALSE),
-                HttpStatus.GATEWAY_TIMEOUT);
+        return new ResponseEntity<>(new ApiResponse().message("Database Request Timeout. Please try again.").success(Boolean.FALSE), HttpStatus.GATEWAY_TIMEOUT);
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleInternalServerException(Exception exp) {
         logger.error("Unexpected error occurred", exp);
-        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                exp.getLocalizedMessage(),
-                HttpStatus.INTERNAL_SERVER_ERROR.name());
+        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), exp.getLocalizedMessage(), HttpStatus.INTERNAL_SERVER_ERROR.name());
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+    @ExceptionHandler(ShortEntityAlreadyExistException.class)
+    public ResponseEntity<?> handleShortEntityAlreadyExistException(ShortEntityAlreadyExistException exp) {
+
+        return new ResponseEntity<>(new ApiResponse()
+                .message(exp.getLocalizedMessage())
+                .success(Boolean.FALSE),
+                HttpStatus.CONFLICT);
+
+    }
+
+    @ExceptionHandler(DynamoDbIndexUnavailableException.class)
+    public ResponseEntity<?> handleDynamoDbIndexUnavailableException(DynamoDbIndexUnavailableException exp) {
+        logger.error("DynamoDB Index Unavailable Exception Occurred", exp);
+        return new ResponseEntity<>(new ApiResponse()
+                .message("Please retry your request shortly.")
+                .success(Boolean.FALSE),
+                HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
 }

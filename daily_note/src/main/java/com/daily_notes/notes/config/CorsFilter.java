@@ -1,3 +1,4 @@
+
 package com.daily_notes.notes.config;
 
 import jakarta.servlet.FilterChain;
@@ -34,7 +35,7 @@ public class CorsFilter extends OncePerRequestFilter {
 
         response.setHeader(
                 "Access-Control-Allow-Headers",
-                "Content-Type, Authorization, userId, X-Request-Id, userid, categoryid, Userid, Categoryid"
+                "Content-Type, Authorization, userId, X-Request-Id, User_Id, categoryid, Userid, Categoryid"
         );
 
         response.setHeader(

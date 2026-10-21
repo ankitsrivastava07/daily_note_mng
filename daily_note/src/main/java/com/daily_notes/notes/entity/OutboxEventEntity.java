@@ -1,8 +1,7 @@
+
 package com.daily_notes.notes.entity;
 
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
-
-import java.time.Instant;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 
 @DynamoDbBean
 public class OutboxEventEntity extends BaseEntity {
@@ -11,13 +10,8 @@ public class OutboxEventEntity extends BaseEntity {
     private String eventType;
     private String payload;
     private String status;
-    private Instant createdAt;
 
-    @Override
-    @DynamoDbPartitionKey
-    public String getId() {
-        return super.getId();
-    }
+    // Do not redeclare createdAt; it is inherited from BaseEntity.
 
     public String getTaskId() {
         return taskId;
@@ -49,13 +43,5 @@ public class OutboxEventEntity extends BaseEntity {
 
     public void setStatus(String status) {
         this.status = status;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
     }
 }

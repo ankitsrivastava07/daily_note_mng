@@ -4,10 +4,7 @@ import com.daily_notes.notes.entity.NoteEntity;
 import com.daily_notes.notes.utility.IdGenerator;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.enhanced.dynamodb.*;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
@@ -52,27 +49,6 @@ public class NoteDaoServiceImpl implements NoteDaoService {
     }
 
     @Override
-    public List<NoteEntity> getAllNotes(String userId, Pageable pageable) {
-        QueryConditional queryConditional =
-                QueryConditional.keyEqualTo(
-                        Key.builder()
-                                .partitionValue(userId)
-                                .build()
-                );
-
-        QueryEnhancedRequest request =
-                QueryEnhancedRequest.builder()
-                        .queryConditional(queryConditional)
-                        .build();
-
-        return dynamoDbTable
-                .query(request)
-                .items()
-                .stream()
-                .toList();
-    }
-
-    @Override
     public NoteEntity getNoteById(String noteId, String userId) {
 
         Key key = Key.builder()
@@ -81,5 +57,46 @@ public class NoteDaoServiceImpl implements NoteDaoService {
                 .build();
 
         return dynamoDbTable.getItem(key);
+    }
+
+    @Override
+    public NoteEntity findByNoteKeyToken(String userId, String token) {
+        DynamoDbIndex<NoteEntity> index =
+                dynamoDbTable.index("user-noteKey-index");
+
+        QueryConditional condition =
+                QueryConditional.keyEqualTo(
+                        Key.builder()
+                                .partitionValue(userId)
+                                .sortValue(token)
+                                .build()
+                );
+
+        return index.query(condition)
+                .stream()
+                .flatMap(page -> page.items().stream())
+                .findFirst()
+                .orElse(null);
+    }
+
+    @Override
+    public List<NoteEntity> getAllNotes(
+            String userId, Pageable pageable) {
+        QueryConditional condition =
+                QueryConditional.keyEqualTo(
+                        Key.builder()
+                                .partitionValue(userId)
+                                .build()
+                );
+
+        QueryEnhancedRequest request =
+                QueryEnhancedRequest.builder()
+                        .queryConditional(condition)
+                        .build();
+
+        return dynamoDbTable.query(request)
+                .items()
+                .stream()
+                .toList();
     }
 }

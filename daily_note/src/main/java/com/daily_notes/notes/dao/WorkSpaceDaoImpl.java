@@ -33,7 +33,8 @@ public class WorkSpaceDaoImpl implements WorkSpaceDao {
                         .partitionValue(userId)
                         .build());
 
-        return table.query(queryConditional).items()
+        List<WorkSpaceEntity> response = table.query(queryConditional).items()
                 .stream().toList();
+        return response;
     }
 }

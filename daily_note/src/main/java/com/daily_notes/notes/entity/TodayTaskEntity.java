@@ -1,36 +1,17 @@
+
 package com.daily_notes.notes.entity;
-
-import org.springframework.data.annotation.Id;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
-
 import java.time.Instant;
-import java.util.Date;
 
 @DynamoDbBean
 public class TodayTaskEntity extends BaseEntity {
 
-    private String id;
     private String name;
     private String content;
     private String priority;
     private String status;
-
-    @Override
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
-    @Override
-    public String getId() {
-        return id;
-    }
-
-    @Override
-    public void setId(String id) {
-        this.id = id;
-    }
+    private Instant dueTime;
+    private String createdBy;
 
     public String getName() {
         return name;
@@ -78,15 +59,5 @@ public class TodayTaskEntity extends BaseEntity {
 
     public void setCreatedBy(String createdBy) {
         this.createdBy = createdBy;
-    }
-
-    private String userId;
-    private Instant dueTime;
-    private String createdBy;
-
-    @Override
-    @DynamoDbPartitionKey
-    public String getUserId() {
-        return userId;
     }
 }

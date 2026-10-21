@@ -1,14 +1,16 @@
+
 package com.daily_notes.notes.entity;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 @DynamoDbBean
 public class WorkspaceNodeEntity extends BaseEntity {
 
     private String workspaceId;
     private String parentId;
+    private String name;
+    private String content;
+    private String type; // FOLDER or FILE
 
     public String getWorkspaceId() {
         return workspaceId;
@@ -48,21 +50,5 @@ public class WorkspaceNodeEntity extends BaseEntity {
 
     public void setType(String type) {
         this.type = type;
-    }
-
-    private String name;
-    private String content;
-    private String type; // FOLDER or FILE
-
-    @Override
-    @DynamoDbPartitionKey
-    public String getUserId() {
-        return super.getUserId();
-    }
-
-    @Override
-    @DynamoDbSortKey
-    public String getId() {
-        return super.getId();
     }
 }

@@ -1,9 +1,7 @@
 package com.daily_notes.notes.entity;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
-
 import java.time.Instant;
-import java.time.LocalDate;
 
 @DynamoDbBean
 public class TaskEntity extends BaseEntity {
@@ -84,7 +82,6 @@ public class TaskEntity extends BaseEntity {
     private String dueTime;
     private String meridiem;
 
-    // Main table PK + GSI PK
     @Override
     @DynamoDbPartitionKey
     @DynamoDbSecondaryPartitionKey(indexNames = "createdAt-index")
@@ -103,4 +100,5 @@ public class TaskEntity extends BaseEntity {
     public Instant getCreatedAt() {
         return super.getCreatedAt();
     }
+
 }

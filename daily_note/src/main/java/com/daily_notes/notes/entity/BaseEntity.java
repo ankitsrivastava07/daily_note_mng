@@ -1,10 +1,33 @@
 package com.daily_notes.notes.entity;
 
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.Instant;
 
+@DynamoDbBean
 public abstract class BaseEntity {
+
+    private String userId;
+    private String id;
+    private Instant createdAt;
+    private Instant updateAt;
+
+    @DynamoDbPartitionKey
+    @DynamoDbAttribute("userId")
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
+    }
+
+    @DynamoDbAttribute("Id")
+    @DynamoDbSortKey
+    public String getId() {
+        return id;
+    }
+
     public void setId(String id) {
         this.id = id;
     }
@@ -23,23 +46,5 @@ public abstract class BaseEntity {
 
     public void setUpdateAt(Instant updateAt) {
         this.updateAt = updateAt;
-    }
-
-    public String getUserId() {
-        return userId;
-    }
-
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
-    private String id;
-    private Instant createdAt;
-    private Instant updateAt;
-    private String userId;
-
-    @DynamoDbSortKey
-    public String getId() {
-        return id;
     }
 }

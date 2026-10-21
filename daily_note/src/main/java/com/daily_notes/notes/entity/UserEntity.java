@@ -1,11 +1,27 @@
+
 package com.daily_notes.notes.entity;
 
-import org.springframework.data.annotation.Id;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 
 @DynamoDbBean
-public class UserEntity {
+public class UserEntity extends BaseEntity {
+
+    private String id;
+    private String userName;
+    private String password;
+    private String email;
+    private String phone;
+    private String address;
+    private String note;
+    private String status;
+    private Integer tokenVersion;
+
+    @DynamoDbPartitionKey
+    public String getId() {
+        return id;
+    }
+
     public void setId(String id) {
         this.id = id;
     }
@@ -72,21 +88,5 @@ public class UserEntity {
 
     public void setTokenVersion(Integer tokenVersion) {
         this.tokenVersion = tokenVersion;
-    }
-
-    @Id
-    private String id;
-    private String userName;
-    private String password;
-    private String email;
-    private String phone;
-    private String address;
-    private String note;
-    private String status;
-    private Integer tokenVersion;
-
-    @DynamoDbSortKey
-    public String getId() {
-        return this.id;
     }
 }

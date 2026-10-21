@@ -10,7 +10,7 @@ import java.util.Map;
 
 public interface ShortNoteService {
 
-    ApiResponse createShortNote(CreateShortNoteDto createShortNoteDto);
+    ApiResponse createShortNote(CreateShortNoteDto createShortNoteDto) throws Exception;
 
     Page<ShortNoteEntity> getAllShortNotes(String categoryId, String userId, Integer limit, Map<String, AttributeValue> attributeValueMap);
 

@@ -1,4 +1,4 @@
-/*
+
 package com.daily_notes.notes.config;
 
 import com.daily_notes.notes.entity.*;
@@ -26,22 +26,17 @@ public class DynamoDbTableInitializer {
 
     public DynamoDbTableInitializer(
             DynamoDbEnhancedClient enhancedClient) {
-
         this.enhancedClient = enhancedClient;
-
-        log.info("DynamoDbTableInitializer bean created");
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void createAllTables() {
 
-        log.info("======================================");
-        log.info("DynamoDB TABLE INITIALIZER STARTED");
-        log.info("dynamodb.create-tables = {}", createTables);
-        log.info("======================================");
+        log.info("DynamoDB table initializer started. Enabled={}",
+                createTables);
 
-        if (createTables) {
-            log.warn("DynamoDB table creation is DISABLED");
+        if (!createTables) {
+            log.info("Table creation disabled");
             return;
         }
 
@@ -53,45 +48,48 @@ public class DynamoDbTableInitializer {
         createTable("today_task", TodayTaskEntity.class);
         createTable("outbox_event", OutboxEventEntity.class);
 
-        log.info("======================================");
-        log.info("DynamoDB TABLE INITIALIZER COMPLETED");
-        log.info("======================================");
+        log.info("DynamoDB table initialization completed");
     }
 
     private <T> void createTable(
             String tableName,
             Class<T> entityClass) {
 
+        log.info("Building schema: table={}, entity={}",
+                tableName, entityClass.getSimpleName());
+
         try {
+            TableSchema<T> schema = TableSchema.fromBean(entityClass);
+
+            log.info("Schema built successfully: {}", tableName);
 
             DynamoDbTable<T> table =
-                    enhancedClient.table(
-                            tableName,
-                            TableSchema.fromBean(entityClass)
-                    );
+                    enhancedClient.table(tableName, schema);
 
-            log.info("Creating/checking table: {}", tableName);
-
+            log.info("Creating table: {}", tableName);
             table.createTable();
 
-            log.info("DynamoDB TABLE CREATED -> {}", tableName);
+            log.info("Table created: {}", tableName);
 
         } catch (ResourceInUseException e) {
-
-            log.info(
-                    "DynamoDB TABLE ALREADY EXISTS -> {}",
-                    tableName
-            );
+            log.info("Table already exists: {}", tableName);
 
         } catch (Exception e) {
-
             log.error(
-                    "FAILED TO CREATE TABLE -> {}",
+                    "FAILED: table={}, entity={}, exception={}",
                     tableName,
+                    entityClass.getName(),
+                    e.getMessage(),
                     e
             );
 
-            throw e;
+            throw new IllegalStateException(
+                    "DynamoDB initialization failed for table: "
+                            + tableName
+                            + ", entity: "
+                            + entityClass.getSimpleName(),
+                    e
+            );
         }
     }
-}*/
+}

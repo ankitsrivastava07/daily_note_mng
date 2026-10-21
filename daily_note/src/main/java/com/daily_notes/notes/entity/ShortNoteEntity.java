@@ -1,6 +1,12 @@
+
 package com.daily_notes.notes.entity;
 
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 import java.time.Instant;
 
@@ -9,6 +15,9 @@ public class ShortNoteEntity extends BaseEntity {
 
     private String name;
     private String content;
+    private String uniqueToken;
+    private String title;
+    private String categoryId;
 
     public String getName() {
         return name;
@@ -34,19 +43,33 @@ public class ShortNoteEntity extends BaseEntity {
         this.title = title;
     }
 
-    public void setCategoryId(String categoryId) {
-        this.categoryId = categoryId;
+    @DynamoDbAttribute("unique_token")
+    @DynamoDbSecondarySortKey(indexNames = "UserUniqueTokenIndex")
+    public String getUniqueToken() {
+        return uniqueToken;
     }
 
-    private String title;
-    private String categoryId;
+    public void setUniqueToken(String uniqueToken) {
+        this.uniqueToken = uniqueToken;
+    }
 
     @Override
     @DynamoDbPartitionKey
-    @DynamoDbSecondaryPartitionKey(indexNames = "LatestNotesIndex")
+    @DynamoDbSecondaryPartitionKey(
+            indexNames = {
+                    "LatestNotesIndex",
+                    "UserUniqueTokenIndex"
+            }
+    )
     @DynamoDbAttribute("user_id")
     public String getUserId() {
         return super.getUserId();
+    }
+
+    @Override
+    @DynamoDbSortKey
+    public String getId() {
+        return super.getId();
     }
 
     @Override
@@ -59,5 +82,9 @@ public class ShortNoteEntity extends BaseEntity {
     @DynamoDbAttribute("categoryId")
     public String getCategoryId() {
         return categoryId;
+    }
+
+    public void setCategoryId(String categoryId) {
+        this.categoryId = categoryId;
     }
 }

@@ -1,6 +1,7 @@
 package com.daily_notes.notes.dao;
 
 import com.daily_notes.notes.entity.NoteEntity;
+import com.daily_notes.notes.records.ApiResponse;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
@@ -18,4 +19,7 @@ public interface NoteDaoService {
     List<NoteEntity> getAllNotes(String userId, Pageable pageable);
 
     NoteEntity getNoteById(String noteId, String userId);
+
+    NoteEntity findByNoteKeyToken(String userId, String token);
+
 }

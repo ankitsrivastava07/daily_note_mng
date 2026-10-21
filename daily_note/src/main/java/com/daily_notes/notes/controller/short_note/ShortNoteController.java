@@ -1,15 +1,15 @@
-package com.daily_notes.notes.controller.note.short_note.v1;
+package com.daily_notes.notes.controller.short_note;
 
 import com.daily_notes.notes.dto.CreateShortNoteDto;
 import com.daily_notes.notes.service.ShortNoteService;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -25,8 +25,8 @@ public class ShortNoteController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createNote(@RequestHeader String userId,
-                                        @RequestBody CreateShortNoteDto createShortNoteDto) {
+    public ResponseEntity<?> createNote(
+            @RequestBody CreateShortNoteDto createShortNoteDto) throws Exception {
         return new ResponseEntity<>(shortNoteService.createShortNote(createShortNoteDto),
                 HttpStatus.CREATED);
     }
@@ -50,11 +50,16 @@ public class ShortNoteController {
         if (categoryid == null) categoryid = request.getHeader("categoryid");
         if (categoryid == null) categoryid = request.getHeader("Categoryid");
 
+        // FIXED: Decode as Map<String, String> instead of Map<String, AttributeValue>
         Map<String, AttributeValue> decodedKey = null;
         if (lastKey != null && !lastKey.isEmpty()) {
             try {
-                decodedKey = new ObjectMapper().readValue(lastKey, new TypeReference<Map<String, AttributeValue>>() {
+                Map<String, String> rawMap = new ObjectMapper().readValue(lastKey, new TypeReference<Map<String, String>>() {
                 });
+                decodedKey = new HashMap<>();
+                for (Map.Entry<String, String> entry : rawMap.entrySet()) {
+                    decodedKey.put(entry.getKey(), AttributeValue.builder().s(entry.getValue()).build());
+                }
             } catch (Exception e) {
                 return ResponseEntity.badRequest().body(Map.of("message", "Invalid lastKey format", "success", false));
             }
@@ -69,7 +74,19 @@ public class ShortNoteController {
 
         Map<String, Object> result = new HashMap<>();
         result.put("items", page.items());
-        result.put("lastEvaluatedKey", page.lastEvaluatedKey());
+
+        // FIXED: Convert page.lastEvaluatedKey() to a safe Map<String, String> for Jackson serialization
+        if (page.lastEvaluatedKey() != null && !page.lastEvaluatedKey().isEmpty()) {
+            Map<String, String> serializableKey = new HashMap<>();
+            for (Map.Entry<String, AttributeValue> entry : page.lastEvaluatedKey().entrySet()) {
+                if (entry.getValue().s() != null) {
+                    serializableKey.put(entry.getKey(), entry.getValue().s());
+                }
+            }
+            result.put("lastEvaluatedKey", serializableKey);
+        } else {
+            result.put("lastEvaluatedKey", null);
+        }
 
         return ResponseEntity.ok(Map.of("data", result));
     }

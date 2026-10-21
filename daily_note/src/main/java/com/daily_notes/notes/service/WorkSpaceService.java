@@ -5,7 +5,7 @@ import com.daily_notes.notes.records.ApiResponse;
 
 public interface WorkSpaceService {
 
-    ApiResponse createWorkSpace(WorkSpaceDto workSpaceDto);
+    ApiResponse createWorkSpace(String userId,WorkSpaceDto workSpaceDto);
 
     void deleteWorkspaceByIdd(String workspaceId) throws UnsupportedOperationException;
 

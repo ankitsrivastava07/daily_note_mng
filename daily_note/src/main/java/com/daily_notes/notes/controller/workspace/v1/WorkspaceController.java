@@ -7,7 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("api/v1/user/{userId}/work-space")
+@RequestMapping("api/v1/work-space")
 public class WorkspaceController {
 
     private final WorkSpaceService workSpaceService;
@@ -17,8 +17,9 @@ public class WorkspaceController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createWorkSpace(@RequestBody WorkSpaceDto workSpaceDto) {
-        return new ResponseEntity<>(workSpaceService.createWorkSpace(workSpaceDto),
+    public ResponseEntity<?> createWorkSpace(@RequestHeader String userId,
+                                             @RequestBody WorkSpaceDto workSpaceDto) {
+        return new ResponseEntity<>(workSpaceService.createWorkSpace(userId, workSpaceDto),
                 HttpStatus.CREATED);
     }
 
@@ -33,7 +34,7 @@ public class WorkspaceController {
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllWorkspaceByUserId(@PathVariable String userId) {
+    public ResponseEntity<?> getAllWorkspaceByUserId(@RequestHeader String userId) {
         return new ResponseEntity<>(workSpaceService.getAllWorkspaceByUserId(userId), HttpStatus.OK);
     }
 

@@ -2,7 +2,8 @@ package com.daily_notes.notes.entity;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -11,11 +12,10 @@ import java.util.List;
 @DynamoDbBean
 public class NoteEntity extends BaseEntity {
 
-    private String userId;
     private String noteKey;
+    private String titleToken;
 
     private Instant createAt;
-    private String id;
     private String title;
     private String content;
     private List<String> attachments = new ArrayList<>();
@@ -35,15 +35,14 @@ public class NoteEntity extends BaseEntity {
     private String remainderAlterId;
     private String repeatNoteAutomaticallyId;
 
-    @Override
-    public void setUserId(String userId) {
-        this.userId = userId;
-    }
-
+    @DynamoDbSecondaryPartitionKey(indexNames = {"noteKey-index"})
     public String getNoteKey() {
         return noteKey;
     }
 
+    @DynamoDbSecondarySortKey(
+            indexNames = "user-noteKey-index"
+    )
     public void setNoteKey(String noteKey) {
         this.noteKey = noteKey;
     }
@@ -54,16 +53,6 @@ public class NoteEntity extends BaseEntity {
 
     public void setCreateAt(Instant createAt) {
         this.createAt = createAt;
-    }
-
-    @Override
-    public String getId() {
-        return id;
-    }
-
-    @Override
-    public void setId(String id) {
-        this.id = id;
     }
 
     public String getTitle() {
@@ -156,6 +145,14 @@ public class NoteEntity extends BaseEntity {
 
     public String getAssigneeOwnerId() {
         return assigneeOwnerId;
+    }
+
+    public String getTitleToken() {
+        return titleToken;
+    }
+
+    public void setTitleToken(String titleToken) {
+        this.titleToken = titleToken;
     }
 
     public void setAssigneeOwnerId(String assigneeOwnerId) {
@@ -274,9 +271,10 @@ public class NoteEntity extends BaseEntity {
     private String referenceURL;
     private String subCategoryId;
 
-    @DynamoDbAttribute("user_id")
-    @DynamoDbPartitionKey
-    public String getUserId(){
-        return userId;
+    @DynamoDbSecondaryPartitionKey(
+            indexNames = "user-noteKey-index"
+    )
+    public String getUserId() {
+        return super.getUserId();
     }
 }

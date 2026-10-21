@@ -1,15 +1,15 @@
+
 package com.daily_notes.notes.entity;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 @DynamoDbBean
 public class WorkSpaceEntity extends BaseEntity {
 
     private String name;
     private String createdBy;
+    private String accessType;
 
     public String getName() {
         return name;
@@ -27,16 +27,12 @@ public class WorkSpaceEntity extends BaseEntity {
         this.createdBy = createdBy;
     }
 
-    @Override
-    @DynamoDbAttribute("user_id")
-    @DynamoDbPartitionKey
-    public String getUserId() {
-        return super.getUserId();
+    @DynamoDbAttribute("access_type")
+    public String getAccessType() {
+        return accessType;
     }
 
-    @Override
-    @DynamoDbSortKey
-    public String getId() {
-        return super.getId();
+    public void setAccessType(String accessType) {
+        this.accessType = accessType;
     }
 }

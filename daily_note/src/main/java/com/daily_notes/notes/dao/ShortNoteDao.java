@@ -12,6 +12,8 @@ public interface ShortNoteDao {
 
     //List<ShortNoteEntity> getAllShortNotes(String categoryId, String userId);
 
+    ShortNoteEntity findByHashToken(String userId, String uniqueToken);
+
     Page<ShortNoteEntity> getAllShortNotes(
             String userId,
             int limit,

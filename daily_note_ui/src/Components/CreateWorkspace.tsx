@@ -1,416 +1,235 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 
-function CreateWorkspaceNode({ workspaceId }) {
-
-    const [nodeName, setNodeName] = useState('');
-    const [nodeType, setNodeType] = useState('FOLDER');
-    const [content, setContent] = useState('');
-    const [nodes, setNodes] = useState([]);
+// ==========================================
+// 1. CREATE WORKWORKSPACE COMPONENT
+// ==========================================
+function CreateWorkspace({ onWorkspaceCreated }) {
+    const [name, setName] = useState('');
+    const [accessType, setAccessType] = useState('PRIVATE');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
-
-    const [parentId, setParentId] = useState('ROOT');
+    const [error, setError] = useState('');
 
     const userId = localStorage.getItem('userId') || 'ankit0397';
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9091';
 
-    // ============================
-    // GET ALL NODES
-    // ============================
-    const getAllNodes = async () => {
-
-        try {
-
-            const response = await fetch(
-                `http://localhost:9091/api/v1/workspaces/${workspaceId}/nodes?parentId=${parentId}`
-            );
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch workspace nodes');
-            }
-
-            const data = await response.json();
-
-            console.log('Workspace Node Response:', data);
-
-            setNodes(data.data || data || []);
-
-        } catch (error) {
-            console.error('Error fetching workspace nodes:', error);
-        }
-    };
-
-
-    // Load nodes
-    useEffect(() => {
-
-        if (workspaceId) {
-            getAllNodes();
-        }
-
-    }, [workspaceId, parentId]);
-
-
-    // ============================
-    // CREATE NODE
-    // ============================
     const handleSubmit = async (e) => {
-
         e.preventDefault();
+        e.stopPropagation();
 
-        const trimmed = nodeName.trim();
-
-        if (!trimmed) {
+        const trimmedName = name.trim();
+        if (!trimmedName) {
+            setError('Workspace name cannot be empty.');
             return;
         }
 
-        const request = {
-            parentId: parentId,
-            name: trimmed,
-            type: nodeType,
-            content: nodeType === 'FILE' ? content : null
+        const requestBody = {
+            name: trimmedName,
+            desc: '',
+            accessType: accessType,
+            createdBy: userId
         };
 
         try {
-
             setLoading(true);
             setMessage('');
+            setError('');
 
-            const response = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL}/api/v1/workspaces/${workspaceId}/nodes`,
-                {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(request)
-                }
-            );
+            const response = await fetch(`${API_BASE_URL}/api/v1/workspaces`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'userId': userId
+                },
+                body: JSON.stringify(requestBody)
+            });
 
             if (!response.ok) {
-                throw new Error('Failed to create workspace node');
+                throw new Error('Failed to create workspace');
             }
 
             const data = await response.json();
+            setMessage('Workspace created successfully!');
+            setName('');
+            setAccessType('PRIVATE');
 
-            console.log('Workspace Node Created:', data);
-
-            setMessage(
-                nodeType === 'FOLDER'
-                    ? 'Folder created successfully'
-                    : 'File created successfully'
-            );
-
-            setNodeName('');
-            setContent('');
-            setNodeType('FOLDER');
-
-            await getAllNodes();
-
-        } catch (error) {
-
-            console.error(
-                'Error creating workspace node:',
-                error
-            );
-
-            setMessage('Failed to create');
-
+            if (onWorkspaceCreated) {
+                onWorkspaceCreated(data.data || data);
+            }
+        } catch (err) {
+            console.error('Error creating workspace:', err);
+            setError('Failed to create workspace. Please check your connection.');
         } finally {
-
             setLoading(false);
         }
     };
 
-
-    // ============================
-    // OPEN FOLDER
-    // ============================
-    const openFolder = (node) => {
-
-        if (node.type === 'FOLDER') {
-            setParentId(node.id);
-        }
-    };
-
-
-    // ============================
-    // GO ROOT
-    // ============================
-    const goToRoot = () => {
-        setParentId('ROOT');
-    };
-
-
     return (
-
-        <div style={{ maxWidth: '600px' }}>
-
-
-            {/* CREATE FOLDER / FILE */}
-
-            <div className="card shadow-sm border-0 p-3 mb-4">
-
-                <h6 className="fw-bold mb-3">
-                    Create Folder / File
-                </h6>
-
-
-                <form onSubmit={handleSubmit}>
-
-
-                    {/* TYPE */}
-
-                    <div className="mb-3">
-
-                        <label
-                            htmlFor="nodeType"
-                            className="form-label fw-semibold small"
-                        >
-                            Type
-                            <span className="text-danger"> *</span>
+        <div className="card shadow-sm border-0 p-4 mb-4">
+            <h5 className="fw-bold mb-3">Create Workspace</h5>
+            <form onSubmit={handleSubmit}>
+                <div className="row g-3">
+                    <div className="col-md-8">
+                        <label htmlFor="workspaceName" className="form-label fw-semibold small">
+                            Workspace Name <span className="text-danger">*</span>
                         </label>
-
-                        <select
-                            id="nodeType"
-                            className="form-select form-select-sm"
-                            value={nodeType}
-                            onChange={(e) =>
-                                setNodeType(e.target.value)
-                            }
-                            disabled={loading}
-                            required
-                        >
-
-                            <option value="FOLDER">
-                                Folder
-                            </option>
-
-                            <option value="FILE">
-                                File
-                            </option>
-
-                        </select>
-
-                    </div>
-
-
-                    {/* NAME */}
-
-                    <div className="mb-3">
-
-                        <label
-                            htmlFor="nodeName"
-                            className="form-label fw-semibold small"
-                        >
-                            Name
-                            <span className="text-danger"> *</span>
-                        </label>
-
                         <input
                             type="text"
-                            id="nodeName"
-                            className="form-control form-control-sm"
-                            placeholder={
-                                nodeType === 'FOLDER'
-                                    ? 'e.g. Interview Preparation'
-                                    : 'e.g. Java Notes'
-                            }
-                            value={nodeName}
-                            onChange={(e) =>
-                                setNodeName(e.target.value)
-                            }
+                            id="workspaceName"
+                            className="form-control"
+                            placeholder="e.g. Daily Notes & Architecture"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
                             disabled={loading}
                             required
                         />
-
                     </div>
-
-
-                    {/* FILE CONTENT */}
-
-                    {nodeType === 'FILE' && (
-
-                        <div className="mb-3">
-
-                            <label
-                                htmlFor="content"
-                                className="form-label fw-semibold small"
-                            >
-                                Content
-                            </label>
-
-                            <textarea
-                                id="content"
-                                className="form-control form-control-sm"
-                                rows="5"
-                                placeholder="Write file content..."
-                                value={content}
-                                onChange={(e) =>
-                                    setContent(e.target.value)
-                                }
-                                disabled={loading}
-                            />
-
-                        </div>
-
-                    )}
-
-
-                    {message && (
-
-                        <div className="small mb-3">
-                            {message}
-                        </div>
-
-                    )}
-
-
-                    <div className="d-flex justify-content-end">
-
-                        <button
-                            type="submit"
-                            className="btn btn-sm btn-primary px-3"
+                    <div className="col-md-4">
+                        <label htmlFor="accessType" className="form-label fw-semibold small">
+                            Access Type
+                        </label>
+                        <select
+                            id="accessType"
+                            className="form-select"
+                            value={accessType}
+                            onChange={(e) => setAccessType(e.target.value)}
                             disabled={loading}
                         >
-
-                            {loading
-                                ? 'Creating...'
-                                : nodeType === 'FOLDER'
-                                    ? 'Create Folder'
-                                    : 'Create File'}
-
-                        </button>
-
+                            <option value="PRIVATE">PRIVATE</option>
+                            <option value="PUBLIC">PUBLIC</option>
+                            <option value="TEAM">TEAM</option>
+                        </select>
                     </div>
-
-                </form>
-
-            </div>
-
-
-            {/* ALL FOLDERS / FILES */}
-
-            <div className="card shadow-sm border-0 p-3">
-
-                <div className="d-flex justify-content-between align-items-center mb-3">
-
-                    <h6 className="fw-bold mb-0">
-                        Folders & Files
-                    </h6>
-
-
-                    {parentId !== 'ROOT' && (
-
-                        <button
-                            type="button"
-                            className="btn btn-sm btn-outline-secondary"
-                            onClick={goToRoot}
-                        >
-                            Back
-                        </button>
-
-                    )}
-
                 </div>
 
+                {message && <div className="alert alert-success py-2 small mt-3 mb-0" role="alert">{message}</div>}
+                {error && <div className="alert alert-danger py-2 small mt-3 mb-0" role="alert">{error}</div>}
 
-                {nodes.length === 0 ? (
-
-                    <div className="text-muted small">
-                        No folder or file created yet.
-                    </div>
-
-                ) : (
-
-                    <div className="list-group">
-
-
-                        {nodes.map((node) => (
-
-                            <div
-                                key={node.id}
-                                className="list-group-item d-flex justify-content-between align-items-center"
-                            >
-
-                                <div className="d-flex align-items-center">
-
-                                    <div
-                                        style={{
-                                            fontSize: '22px',
-                                            marginRight: '10px'
-                                        }}
-                                    >
-
-                                        {node.type === 'FOLDER'
-                                            ? '📁'
-                                            : '📄'}
-
-                                    </div>
-
-
-                                    <div>
-
-                                        <div className="fw-semibold">
-                                            {node.name}
-                                        </div>
-
-                                        <small className="text-muted">
-
-                                            {node.type}
-
-                                            {' • '}
-
-                                            {node.id}
-
-                                        </small>
-
-                                    </div>
-
-                                </div>
-
-
-                                {/* OPEN FOLDER */}
-
-                                {node.type === 'FOLDER' && (
-
-                                    <button
-                                        type="button"
-                                        className="btn btn-sm btn-outline-primary"
-                                        onClick={() =>
-                                            openFolder(node)
-                                        }
-                                    >
-                                        Open
-                                    </button>
-
-                                )}
-
-
-                                {/* FILE */}
-
-                                {node.type === 'FILE' && (
-
-                                    <button
-                                        type="button"
-                                        className="btn btn-sm btn-outline-secondary"
-                                    >
-                                        View
-                                    </button>
-
-                                )}
-
-                            </div>
-
-                        ))}
-
-                    </div>
-
-                )}
-
-            </div>
-
+                <div className="d-flex justify-content-end mt-3">
+                    <button type="submit" className="btn btn-primary px-4" disabled={loading}>
+                        {loading ? 'Creating...' : 'Create Workspace'}
+                    </button>
+                </div>
+            </form>
         </div>
     );
 }
 
-export default CreateWorkspaceNode;
+// ==========================================
+// 2. WORKSPACE LIST COMPONENT
+// ==========================================
+function WorkspaceList({ refreshTrigger, onSelectWorkspace }) {
+    const [workspaces, setWorkspaces] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+
+    const userId = localStorage.getItem('userId') || 'ankit0397';
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9091';
+
+    useEffect(() => {
+        const fetchWorkspaces = async () => {
+            try {
+                setLoading(true);
+                const response = await fetch(`${API_BASE_URL}/api/v1/workspaces`, {
+                    method: 'GET',
+                    headers: {
+                        'X-User-Id': userId
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch workspaces');
+                }
+
+                const result = await response.json();
+                const workspaceList = result.data || result;
+                setWorkspaces(Array.isArray(workspaceList) ? workspaceList : []);
+            } catch (err) {
+                console.error('Error fetching workspaces:', err);
+                setError('Could not load workspaces.');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchWorkspaces();
+    }, [userId, API_BASE_URL, refreshTrigger]);
+
+    if (loading) {
+        return (
+            <div className="text-center my-4">
+                <div className="spinner-border text-primary spinner-border-sm" role="status">
+                    <span className="visually-hidden">Loading...</span>
+                </div>
+            </div>
+        );
+    }
+
+    if (error) {
+        return <div className="alert alert-danger text-center py-2 small" role="alert">{error}</div>;
+    }
+
+    if (workspaces.length === 0) {
+        return (
+            <div className="text-center my-4 text-muted small">
+                <p>No workspaces found. Create one above to get started!</p>
+            </div>
+        );
+    }
+
+    return (
+        <div>
+            <h5 className="fw-bold mb-3">Your Workspaces</h5>
+            <div className="row g-3">
+                {workspaces.map((ws) => (
+                    <div className="col-md-4" key={ws.id}>
+                        <div className="card shadow-sm border-0 h-100 p-3">
+                            <div className="card-body d-flex flex-column justify-content-between">
+                                <div>
+                                    <div className="d-flex justify-content-between align-items-start mb-2">
+                                        <h6 className="fw-bold text-dark mb-0">{ws.name}</h6>
+                                        <span className="badge bg-secondary small">{ws.accessType || 'PRIVATE'}</span>
+                                    </div>
+                                    <p className="text-muted small mb-3">
+                                        {ws.desc || 'No description provided.'}
+                                    </p>
+                                </div>
+                                <button
+                                    className="btn btn-outline-primary btn-sm mt-auto"
+                                    onClick={() => onSelectWorkspace && onSelectWorkspace(ws)}
+                                >
+                                    Open Workspace
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ==========================================
+// 3. MAIN CONTAINER DASHBOARD
+// ==========================================
+export default function WorkspaceDashboard() {
+    const [refreshKey, setRefreshKey] = useState(0);
+
+    const handleWorkspaceCreated = () => {
+        setRefreshKey(prev => prev + 1); // Triggers WorkspaceList reload
+    };
+
+    const handleSelectWorkspace = (workspace) => {
+        console.log('Selected Workspace:', workspace);
+        // Add navigation logic here, e.g., navigate(`/workspaces/${workspace.id}/nodes`)
+    };
+
+    return (
+        <div className="container py-4" style={{ maxWidth: '900px' }}>
+            <h2 className="mb-4 fw-bold">Workspace Management</h2>
+            <CreateWorkspace onWorkspaceCreated={handleWorkspaceCreated} />
+            <hr className="my-4" />
+            <WorkspaceList refreshTrigger={refreshKey} onSelectWorkspace={handleSelectWorkspace} />
+        </div>
+    );
+}
