@@ -1,6 +1,6 @@
+
 package com.daily_notes.notes.entity;
 
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
@@ -14,7 +14,6 @@ public class NoteEntity extends BaseEntity {
 
     private String noteKey;
     private String titleToken;
-
     private Instant createAt;
     private String title;
     private String content;
@@ -34,17 +33,34 @@ public class NoteEntity extends BaseEntity {
     private String estTime;
     private String remainderAlterId;
     private String repeatNoteAutomaticallyId;
+    private String categoryId;
+    private String keyTakeAwaysHighLights;
+    private String description;
+    private List<String> checkList = new ArrayList<>();
+    private List<String> tags = new ArrayList<>();
+    private String referenceURL;
+    private String subCategoryId;
 
-    @DynamoDbSecondaryPartitionKey(indexNames = {"noteKey-index"})
+    // GSI: user-noteKey-index
+    // Assumes userId is the GSI partition key and noteKey is its sort key.
+    @DynamoDbSecondarySortKey(indexNames = "user-noteKey-index")
     public String getNoteKey() {
         return noteKey;
     }
 
-    @DynamoDbSecondarySortKey(
-            indexNames = "user-noteKey-index"
-    )
     public void setNoteKey(String noteKey) {
         this.noteKey = noteKey;
+    }
+
+    // Keep the inherited BaseEntity primary-key mapping for userId.
+    // Do not override getUserId() here.
+
+    // GSI: noteKey-index
+    // Keep this annotation only if noteKey-index uses noteKey as its partition key.
+    // If this index does not exist in your actual table schema, remove this annotation.
+    @DynamoDbSecondaryPartitionKey(indexNames = "noteKey-index")
+    public String getNoteKeyForIndex() {
+        return noteKey;
     }
 
     public Instant getCreateAt() {
@@ -147,16 +163,16 @@ public class NoteEntity extends BaseEntity {
         return assigneeOwnerId;
     }
 
+    public void setAssigneeOwnerId(String assigneeOwnerId) {
+        this.assigneeOwnerId = assigneeOwnerId;
+    }
+
     public String getTitleToken() {
         return titleToken;
     }
 
     public void setTitleToken(String titleToken) {
         this.titleToken = titleToken;
-    }
-
-    public void setAssigneeOwnerId(String assigneeOwnerId) {
-        this.assigneeOwnerId = assigneeOwnerId;
     }
 
     public String getLocation() {
@@ -261,20 +277,5 @@ public class NoteEntity extends BaseEntity {
 
     public void setSubCategoryId(String subCategoryId) {
         this.subCategoryId = subCategoryId;
-    }
-
-    private String categoryId;
-    private String keyTakeAwaysHighLights;
-    private String description;
-    private List<String> checkList = new ArrayList<>();
-    private List<String> tags = new ArrayList<>();
-    private String referenceURL;
-    private String subCategoryId;
-
-    @DynamoDbSecondaryPartitionKey(
-            indexNames = "user-noteKey-index"
-    )
-    public String getUserId() {
-        return super.getUserId();
     }
 }
