@@ -16,6 +16,7 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
 import software.amazon.awssdk.core.exception.SdkClientException;
+import software.amazon.awssdk.services.dynamodb.model.DynamoDbException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -48,13 +49,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(new ApiResponse().message("Database Request Timeout. Please try again.").success(Boolean.FALSE), HttpStatus.GATEWAY_TIMEOUT);
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<?> handleInternalServerException(Exception exp) {
-        logger.error("Unexpected error occurred", exp);
-        ErrorResponse errorResponse = new ErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), exp.getLocalizedMessage(), HttpStatus.INTERNAL_SERVER_ERROR.name());
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
     @ExceptionHandler(ShortEntityAlreadyExistException.class)
     public ResponseEntity<?> handleShortEntityAlreadyExistException(ShortEntityAlreadyExistException exp) {
 
@@ -72,6 +66,44 @@ public class GlobalExceptionHandler {
                 .message("Please retry your request shortly.")
                 .success(Boolean.FALSE),
                 HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<?> handleInternalServerException(Exception exp) {
+        logger.error("Unexpected error occurred", exp);
+
+        Throwable cause = exp;
+
+        while (cause != null) {
+            String message = cause.getMessage();
+
+            if (message != null
+                    && message.contains(
+                    "Cannot read from backfilling global secondary index")) {
+
+                ErrorResponse errorResponse = new ErrorResponse(
+                        HttpStatus.SERVICE_UNAVAILABLE.value(),
+                        "Task Create is temporarily unavailable. Please retry shortly.",
+                        HttpStatus.SERVICE_UNAVAILABLE.name()
+                );
+
+                return ResponseEntity
+                        .status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body(errorResponse);
+            }
+
+            cause = cause.getCause();
+        }
+
+        ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.INTERNAL_SERVER_ERROR.value(),
+                "An unexpected error occurred.",
+                HttpStatus.INTERNAL_SERVER_ERROR.name()
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(errorResponse);
     }
 
 }

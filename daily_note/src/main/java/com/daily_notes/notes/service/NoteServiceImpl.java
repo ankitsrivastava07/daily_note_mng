@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Locale;
 import java.util.NoSuchElementException;
 import java.util.regex.Pattern;
 
@@ -40,7 +39,7 @@ public class NoteServiceImpl implements NoteService {
     @Override
     public ApiResponse createNote(CreateNoteDtoRecord createNoteDto) throws Exception {
         String userId = createNoteDto.userId();
-        String title = normalizeTitle(createNoteDto.title());
+        String title = createNoteDto.title();
 
         logger.info("Creating note for userId: {} with title: {}", userId, title);
 
@@ -48,10 +47,11 @@ public class NoteServiceImpl implements NoteService {
             throw new IllegalArgumentException("Note title cannot be blank.");
         }
 
-        String token = TokenUtil.generateToken(userId + ":" + title.toLowerCase(Locale.ROOT));
+        String token = TokenUtil.generateToken(userId, title);
         if (noteDaoService.findByNoteKeyToken(userId, token) != null) {
             logger.info("Note with title: {} already exists for userId: {}", title, userId);
-            throw new NoteAlreadyExistException("Note with the same name already exists.");
+            throw new NoteAlreadyExistException("You already have a note with this title" +
+                    " in your account. Please choose a different title.");
         }
 
         NoteEntity noteEntity = CustomMapper.mapToEntity(createNoteDto, NoteEntity.class);
@@ -61,13 +61,6 @@ public class NoteServiceImpl implements NoteService {
         logger.info("Note with title: {} does not exist for userId: {}", title, userId);
         noteEntity = noteDaoService.createNote(noteEntity);
         return new ApiResponse(SUCCESS, true, noteEntity, new ArrayList<>());
-    }
-
-    private String normalizeTitle(String title) {
-        if (title == null) {
-            return "";
-        }
-        return WHITESPACE_PATTERN.matcher(title.strip()).replaceAll(" ");
     }
 
     @Override

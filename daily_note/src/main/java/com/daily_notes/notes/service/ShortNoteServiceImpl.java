@@ -33,15 +33,16 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         logger.info("Creating short note: {}", createShortNoteDto);
         ShortNoteEntity entity = CustomMapper.mapToEntity(createShortNoteDto, ShortNoteEntity.class);
         entity.setId(UUID.randomUUID().toString());
-        String title = createShortNoteDto.title().trim().replaceAll("\\s+", " ");
-        String token = TokenUtil.generateToken(createShortNoteDto.userId() +
-                ":" + title.toLowerCase(Locale.ROOT));
+        String token = TokenUtil.generateToken(createShortNoteDto.userId(), createShortNoteDto.title());
         if ((entity = shortNoteDao.findByHashToken(createShortNoteDto.userId(), token)) != null) {
-            logger.info("Short note with the same name already exists for userId: {} and title: {}",
-                    createShortNoteDto.userId(), title);
-            throw new ShortEntityAlreadyExistException("Short note with the same name already exists.");
+            logger.info(
+                    "Duplicate short note title detected for userId: {} and title: {}",
+                    createShortNoteDto.userId(),
+                    createShortNoteDto.title()
+            );
+            throw new ShortEntityAlreadyExistException("You already have a short note with " +
+                    "this title in your account. Please choose a different title.");
         }
-        entity.setTitle(title);
         entity.setUniqueToken(token);
         shortNoteDao.createShortNote(entity);
         return new

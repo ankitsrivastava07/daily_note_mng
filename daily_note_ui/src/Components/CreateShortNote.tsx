@@ -5,6 +5,7 @@ function CreateShortNote() {
     const [inputValue, setInputValue] = useState({ title: '', content: '', categoryId: "others", userId: 'ankit0397' });
     const [isSuccess, setIsSuccess] = useState(null);
     const [formErrors, setFormErrors] = useState({});
+    const [apiError, setApiError] = useState("");
 
     // A mapping helper to show the user-friendly label on the dropdown button
     const categoryLabels = {
@@ -74,28 +75,49 @@ function CreateShortNote() {
 
         console.log("Form Submitted Successfully!", inputValue);
 
-       fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/short-note`, {
+        setIsSuccess(null);
+        fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/short-note`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "userId": "ankit0397",
+                userId: "ankit0397",
             },
             body: JSON.stringify(inputValue),
         })
-            .then(response => {
-                if (!response.ok) throw new Error("Network response error");
-                return response.json();
+            .then(async (response) => {
+                const data = await response.json();
+                console.log("Response Status:", response.status);
+                console.log("Response Body:", data);
+
+                if (!response.ok || data.success === false) {
+                    setApiError(
+                        data.message ||
+                        `Request failed (${response.status})`
+                    );
+                    throw new Error(
+                        data.message ||
+                        `Request failed (${response.status})`
+                    );
+                }
+                return data;
             })
-            .then(data => {
+            .then((data) => {
                 console.log("Success:", data);
                 setIsSuccess(true);
-                // Clear form fields back to empty options on success
-                setInputValue({ title: '', content: '', categoryId: "others", userId: 'ankit0397' });
-                setTimeout(() => setIsSuccess(null), 3000); // Reset success message after 3 seconds
+                setApiError("");
+
+                setInputValue({
+                    title: "",
+                    content: "",
+                    categoryId: "others",
+                    userId: "ankit0397",
+                });
             })
-            .catch(error => {
+            .catch((error) => {
                 console.error("Error:", error);
-                setIsSuccess(false);
+                // setIsSuccess(false);
+                setTimeout(() => setIsSuccess(false), 300);
+
             });
     };
 
@@ -147,6 +169,11 @@ function CreateShortNote() {
                         id="exampleFormControlInput1"
                         placeholder="Short Note Name"
                     />
+                    {isSuccess === false && (
+                        <div style={{ color: 'red', marginTop: '5px', fontSize: '14px' }}>
+                            {apiError || "An error occurred while saving the note. Please try again."}
+                        </div>
+                    )}
                     {formErrors.title && (
                         <div style={{ color: 'red', marginTop: '5px', fontSize: '14px' }}>
                             {formErrors.title}
@@ -179,11 +206,7 @@ function CreateShortNote() {
                         Note saved successfully!
                     </div>
                 )}
-                {isSuccess === false && (
-                    <div className="alert alert-danger mt-3" role="alert">
-                        Failed to save note. Please try again.
-                    </div>
-                )}
+
             </form>
         </>
     );

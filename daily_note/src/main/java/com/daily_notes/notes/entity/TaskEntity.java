@@ -1,35 +1,22 @@
+
 package com.daily_notes.notes.entity;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
+
 import java.time.Instant;
 
 @DynamoDbBean
 public class TaskEntity extends BaseEntity {
 
     private String name;
-
-    public String getDueDate() {
-        return dueDate;
-    }
-
-    public void setDueDate(String dueDate) {
-        this.dueDate = dueDate;
-    }
-
+    private String taskTokenKey;
     private String content;
     private String priority;
     private String status;
-
-    public String getSlugName() {
-        return slugName;
-    }
-
-    public void setSlugName(String slugName) {
-        this.slugName = slugName;
-    }
-
     private String slugName;
     private String dueDate;
+    private String dueTime;
+    private String meridiem;
 
     public String getName() {
         return name;
@@ -37,6 +24,15 @@ public class TaskEntity extends BaseEntity {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    @DynamoDbSecondaryPartitionKey(indexNames = "taskTokenKey-index")
+    public String getTaskTokenKey() {
+        return taskTokenKey;
+    }
+
+    public void setTaskTokenKey(String taskTokenKey) {
+        this.taskTokenKey = taskTokenKey;
     }
 
     public String getContent() {
@@ -63,6 +59,22 @@ public class TaskEntity extends BaseEntity {
         this.status = status;
     }
 
+    public String getSlugName() {
+        return slugName;
+    }
+
+    public void setSlugName(String slugName) {
+        this.slugName = slugName;
+    }
+
+    public String getDueDate() {
+        return dueDate;
+    }
+
+    public void setDueDate(String dueDate) {
+        this.dueDate = dueDate;
+    }
+
     public String getDueTime() {
         return dueTime;
     }
@@ -78,9 +90,6 @@ public class TaskEntity extends BaseEntity {
     public void setMeridiem(String meridiem) {
         this.meridiem = meridiem;
     }
-
-    private String dueTime;
-    private String meridiem;
 
     @Override
     @DynamoDbPartitionKey
@@ -100,5 +109,4 @@ public class TaskEntity extends BaseEntity {
     public Instant getCreatedAt() {
         return super.getCreatedAt();
     }
-
 }

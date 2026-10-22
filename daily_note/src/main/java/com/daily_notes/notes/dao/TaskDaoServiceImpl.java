@@ -149,4 +149,24 @@ public class TaskDaoServiceImpl implements TaskDaoService {
                 .lastEvaluatedKey(lastEvaluatedKey)
                 .build();
     }
+
+    @Override
+    public TaskEntity findByTaskTokenKey(String userId, String token) {
+        DynamoDbIndex<TaskEntity> index =
+                table.index("taskTokenKey-index");
+
+        QueryConditional condition =
+                QueryConditional.keyEqualTo(
+                        Key.builder()
+                                .partitionValue(token)
+                                .build()
+                );
+
+        return index.query(condition)
+                .stream()
+                .flatMap(page -> page.items().stream())
+                .filter(task -> userId.equals(task.getUserId()))
+                .findFirst()
+                .orElse(null);
+    }
 }

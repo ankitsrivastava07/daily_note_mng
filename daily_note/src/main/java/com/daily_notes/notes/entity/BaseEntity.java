@@ -22,7 +22,7 @@ public abstract class BaseEntity {
         this.userId = userId;
     }
 
-    @DynamoDbAttribute("Id")
+    @DynamoDbAttribute("id")
     @DynamoDbSortKey
     public String getId() {
         return id;

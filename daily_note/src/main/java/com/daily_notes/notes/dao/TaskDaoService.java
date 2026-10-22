@@ -8,4 +8,6 @@ public interface TaskDaoService {
     void createTask(TaskEntity taskEntity);
 
     Page<TaskEntity> getAllTasksByUserId(String userId, Integer limit, String lastId, String search);
+
+    TaskEntity findByTaskTokenKey(String userId, String token);
 }
