@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from 'react';
 
 // ==========================================
-// 1. CREATE WORKWORKSPACE COMPONENT
+// 1. CREATE WORKSPACE COMPONENT
 // ==========================================
 function CreateWorkspace({ onWorkspaceCreated }) {
     const [name, setName] = useState('');
@@ -11,13 +12,19 @@ function CreateWorkspace({ onWorkspaceCreated }) {
     const [error, setError] = useState('');
 
     const userId = localStorage.getItem('userId') || 'ankit0397';
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9091';
+    const API_BASE_URL =
+        import.meta.env.VITE_API_BASE_URL || 'http://localhost:9091';
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        e.stopPropagation();
+
+        if (loading) return;
 
         const trimmedName = name.trim();
+
+        setMessage('');
+        setError('');
+
         if (!trimmedName) {
             setError('Workspace name cannot be empty.');
             return;
@@ -26,53 +33,56 @@ function CreateWorkspace({ onWorkspaceCreated }) {
         const requestBody = {
             name: trimmedName,
             desc: '',
-            accessType: accessType,
+            accessType,
             createdBy: userId
         };
 
         try {
             setLoading(true);
-            setMessage('');
-            setError('');
 
-            const response = await fetch(`${API_BASE_URL}/api/v1/work-space`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    userId: userId
-                },
-                body: JSON.stringify(requestBody)
-            });
+            const response = await fetch(
+                `${API_BASE_URL}/api/v1/work-space`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        userId
+                    },
+                    body: JSON.stringify(requestBody)
+                }
+            );
 
+            // Read the response body only once.
             const result = await response.json();
 
             if (!response.ok) {
-                console.log('Error:', result);
-
                 if (response.status === 409) {
                     setError(result.message || 'Workspace already exists.');
                     return;
                 }
 
                 throw new Error(
-                    result.message || 'Failed to create workspace'
+                    result.message || `Request failed (${response.status})`
                 );
             }
 
-            // Success
+            // Success: show only the success message.
+            setError('');
             setMessage(result.message || 'Workspace created successfully!');
 
-            const data = await response.json();
-            setMessage('Workspace created successfully!');
             setName('');
             setAccessType('PRIVATE');
 
+            // Refresh the workspace list after successful creation.
             if (onWorkspaceCreated) {
-                onWorkspaceCreated(data.data || data);
+                onWorkspaceCreated();
             }
         } catch (err) {
             console.error('Error creating workspace:', err);
-            setError('Failed to create workspace. Please check your connection.');
+            setMessage('');
+            setError(
+                err.message || 'Failed to create workspace. Please try again.'
+            );
         } finally {
             setLoading(false);
         }
@@ -81,27 +91,41 @@ function CreateWorkspace({ onWorkspaceCreated }) {
     return (
         <div className="card shadow-sm border-0 p-4 mb-4">
             <h5 className="fw-bold mb-3">Create Workspace</h5>
+
             <form onSubmit={handleSubmit}>
                 <div className="row g-3">
                     <div className="col-md-8">
-                        <label htmlFor="workspaceName" className="form-label fw-semibold small">
+                        <label
+                            htmlFor="workspaceName"
+                            className="form-label fw-semibold small"
+                        >
                             Workspace Name <span className="text-danger">*</span>
                         </label>
+
                         <input
                             type="text"
                             id="workspaceName"
                             className="form-control"
                             placeholder="e.g. Daily Notes & Architecture"
                             value={name}
-                            onChange={(e) => setName(e.target.value)}
+                            onChange={(e) => {
+                                setName(e.target.value);
+                                setError('');
+                                setMessage('');
+                            }}
                             disabled={loading}
                             required
                         />
                     </div>
+
                     <div className="col-md-4">
-                        <label htmlFor="accessType" className="form-label fw-semibold small">
+                        <label
+                            htmlFor="accessType"
+                            className="form-label fw-semibold small"
+                        >
                             Access Type
                         </label>
+
                         <select
                             id="accessType"
                             className="form-select"
@@ -116,11 +140,30 @@ function CreateWorkspace({ onWorkspaceCreated }) {
                     </div>
                 </div>
 
-                {message && <div className="alert alert-success py-2 small mt-3 mb-0" role="alert">{message}</div>}
-                {error && <div className="alert alert-danger py-2 small mt-3 mb-0" role="alert">{error}</div>}
+                {message && (
+                    <div
+                        className="alert alert-success py-2 small mt-3 mb-0"
+                        role="status"
+                    >
+                        {message}
+                    </div>
+                )}
+
+                {error && (
+                    <div
+                        className="alert alert-danger py-2 small mt-3 mb-0"
+                        role="alert"
+                    >
+                        {error}
+                    </div>
+                )}
 
                 <div className="d-flex justify-content-end mt-3">
-                    <button type="submit" className="btn btn-primary px-4" disabled={loading}>
+                    <button
+                        type="submit"
+                        className="btn btn-primary px-4"
+                        disabled={loading}
+                    >
                         {loading ? 'Creating...' : 'Create Workspace'}
                     </button>
                 </div>
@@ -138,41 +181,62 @@ function WorkspaceList({ refreshTrigger, onSelectWorkspace }) {
     const [error, setError] = useState('');
 
     const userId = localStorage.getItem('userId') || 'ankit0397';
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:9091';
+    const API_BASE_URL =
+        import.meta.env.VITE_API_BASE_URL || 'http://localhost:9091';
 
     useEffect(() => {
+        const controller = new AbortController();
+
         const fetchWorkspaces = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_BASE_URL}/api/v1/work-space`, {
-                    method: 'GET',
-                    headers: {
-                        'userId': userId
+                setError('');
+
+                const response = await fetch(
+                    `${API_BASE_URL}/api/v1/work-space`,
+                    {
+                        method: 'GET',
+                        headers: { userId },
+                        signal: controller.signal
                     }
-                });
+                );
 
                 if (!response.ok) {
-                    throw new Error('Failed to fetch workspaces');
+                    throw new Error(
+                        `Failed to fetch workspaces (${response.status})`
+                    );
                 }
 
                 const result = await response.json();
-                const workspaceList = result.data || result;
-                setWorkspaces(Array.isArray(workspaceList) ? workspaceList : []);
+                const workspaceList = result.data ?? result;
+
+                setWorkspaces(
+                    Array.isArray(workspaceList) ? workspaceList : []
+                );
             } catch (err) {
-                console.error('Error fetching workspaces:', err);
-                setError('Could not load workspaces.');
+                if (err.name !== 'AbortError') {
+                    console.error('Error fetching workspaces:', err);
+                    setError('Could not load workspaces.');
+                }
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) {
+                    setLoading(false);
+                }
             }
         };
 
         fetchWorkspaces();
+
+        return () => controller.abort();
     }, [userId, API_BASE_URL, refreshTrigger]);
 
     if (loading) {
         return (
             <div className="text-center my-4">
-                <div className="spinner-border text-primary spinner-border-sm" role="status">
+                <div
+                    className="spinner-border text-primary spinner-border-sm"
+                    role="status"
+                >
                     <span className="visually-hidden">Loading...</span>
                 </div>
             </div>
@@ -180,7 +244,11 @@ function WorkspaceList({ refreshTrigger, onSelectWorkspace }) {
     }
 
     if (error) {
-        return <div className="alert alert-danger text-center py-2 small" role="alert">{error}</div>;
+        return (
+            <div className="alert alert-danger text-center py-2 small" role="alert">
+                {error}
+            </div>
+        );
     }
 
     if (workspaces.length === 0) {
@@ -194,6 +262,7 @@ function WorkspaceList({ refreshTrigger, onSelectWorkspace }) {
     return (
         <div>
             <h5 className="fw-bold mb-3">Your Workspaces</h5>
+
             <div className="row g-3">
                 {workspaces.map((ws) => (
                     <div className="col-md-4" key={ws.id}>
@@ -201,16 +270,24 @@ function WorkspaceList({ refreshTrigger, onSelectWorkspace }) {
                             <div className="card-body d-flex flex-column justify-content-between">
                                 <div>
                                     <div className="d-flex justify-content-between align-items-start mb-2">
-                                        <h6 className="fw-bold text-dark mb-0">{ws.name}</h6>
-                                        <span className="badge bg-secondary small">{ws.accessType || 'PRIVATE'}</span>
+                                        <h6 className="fw-bold text-dark mb-0">
+                                            {ws.name}
+                                        </h6>
+
+                                        <span className="badge bg-secondary small">
+                                            {ws.accessType || 'PRIVATE'}
+                                        </span>
                                     </div>
+
                                     <p className="text-muted small mb-3">
                                         {ws.desc || 'No description provided.'}
                                     </p>
                                 </div>
+
                                 <button
+                                    type="button"
                                     className="btn btn-outline-primary btn-sm mt-auto"
-                                    onClick={() => onSelectWorkspace && onSelectWorkspace(ws)}
+                                    onClick={() => onSelectWorkspace?.(ws)}
                                 >
                                     Open Workspace
                                 </button>
@@ -224,26 +301,34 @@ function WorkspaceList({ refreshTrigger, onSelectWorkspace }) {
 }
 
 // ==========================================
-// 3. MAIN CONTAINER DASHBOARD
+// 3. MAIN WORKSPACE DASHBOARD
 // ==========================================
 export default function WorkspaceDashboard() {
     const [refreshKey, setRefreshKey] = useState(0);
 
     const handleWorkspaceCreated = () => {
-        setRefreshKey(prev => prev + 1); // Triggers WorkspaceList reload
+        setRefreshKey((previous) => previous + 1);
     };
 
     const handleSelectWorkspace = (workspace) => {
         console.log('Selected Workspace:', workspace);
-        // Add navigation logic here, e.g., navigate(`/workspaces/${workspace.id}/nodes`)
+        // Add navigation logic here.
     };
 
     return (
         <div className="container py-4" style={{ maxWidth: '900px' }}>
             <h2 className="mb-4 fw-bold">Workspace Management</h2>
-            <CreateWorkspace onWorkspaceCreated={handleWorkspaceCreated} />
+
+            <CreateWorkspace
+                onWorkspaceCreated={handleWorkspaceCreated}
+            />
+
             <hr className="my-4" />
-            <WorkspaceList refreshTrigger={refreshKey} onSelectWorkspace={handleSelectWorkspace} />
+
+            <WorkspaceList
+                refreshTrigger={refreshKey}
+                onSelectWorkspace={handleSelectWorkspace}
+            />
         </div>
     );
 }
