@@ -8,6 +8,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 import java.util.List;
 
@@ -28,13 +29,16 @@ public class WorkSpaceDaoImpl implements WorkSpaceDao {
 
     @Override
     public List<WorkSpaceEntity> getAllWorkspaceByUserId(String userId) {
-        QueryConditional queryConditional = QueryConditional
-                .keyEqualTo(Key.builder()
+        QueryConditional condition = QueryConditional.keyEqualTo(
+                Key.builder()
                         .partitionValue(userId)
-                        .build());
+                        .build()
+        );
 
-        List<WorkSpaceEntity> response = table.query(queryConditional).items()
-                .stream().toList();
-        return response;
+        QueryEnhancedRequest request = QueryEnhancedRequest.builder()
+                .queryConditional(condition)
+                .build();
+
+        return table.query(request).items().stream().toList();
     }
 }
