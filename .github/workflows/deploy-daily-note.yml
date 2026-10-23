@@ -4,14 +4,14 @@
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker tag dailynote:latest \
-            $ECR_REGISTRY/dailynote:$IMAGE_TAG
+            "$ECR_REGISTRY/dailynote:$IMAGE_TAG"
 
       - name: Push Docker image
         env:
           ECR_REGISTRY: 446394402725.dkr.ecr.ap-south-1.amazonaws.com
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker push $ECR_REGISTRY/dailynote:$IMAGE_TAG
+          docker push "$ECR_REGISTRY/dailynote:$IMAGE_TAG"
 
       - name: Deploy to AWS Lambda
         env:
@@ -32,9 +32,24 @@
             --region ap-south-1
 
       - name: Verify deployed image
+        env:
+          ECR_REGISTRY: 446394402725.dkr.ecr.ap-south-1.amazonaws.com
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          aws lambda get-function \
+          DEPLOYED_IMAGE=$(aws lambda get-function \
             --function-name daily_note_app \
             --region ap-south-1 \
             --query 'Code.ResolvedImageUri' \
-            --output text
+            --output text)
+
+          echo "Deployed image: $DEPLOYED_IMAGE"
+
+          case "$DEPLOYED_IMAGE" in
+            "$ECR_REGISTRY/dailynote:$IMAGE_TAG"*) 
+              echo "Lambda image verification successful."
+              ;;
+            *)
+              echo "ERROR: Deployed Lambda image does not match this commit."
+              exit 1
+              ;;
+          esac
