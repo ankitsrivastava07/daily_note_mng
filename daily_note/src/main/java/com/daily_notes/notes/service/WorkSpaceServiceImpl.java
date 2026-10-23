@@ -42,7 +42,7 @@ public class WorkSpaceServiceImpl implements WorkSpaceService {
         workSpaceDao.createWorkSpace(entity);
 
         return new ApiResponse()
-                .message("Success")
+                .message("Workspace created successfully!")
                 .success(true);
     }
 
