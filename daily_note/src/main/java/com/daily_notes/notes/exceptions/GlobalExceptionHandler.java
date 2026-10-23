@@ -1,9 +1,7 @@
 package com.daily_notes.notes.exceptions;
 
 import com.daily_notes.notes.dto.ErrorResponse;
-import com.daily_notes.notes.exceptions.exception.DynamoDbIndexUnavailableException;
-import com.daily_notes.notes.exceptions.exception.ShortEntityAlreadyExistException;
-import com.daily_notes.notes.exceptions.exception.TaskAlreadyExistException;
+import com.daily_notes.notes.exceptions.exception.*;
 import com.daily_notes.notes.records.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -12,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
-import com.daily_notes.notes.exceptions.exception.NoteNotFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import software.amazon.awssdk.core.exception.ApiCallAttemptTimeoutException;
 import software.amazon.awssdk.core.exception.ApiCallTimeoutException;
@@ -78,10 +75,18 @@ public class GlobalExceptionHandler {
                 HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(WorkSpaceAlreadyExistException.class)
+    public ResponseEntity<?> handleWorkSpaceAlreadyExistException(WorkSpaceAlreadyExistException exp) {
+        logger.info("Workspace Already Exist Exception Occurred {}", exp.getMessage());
+        return new ResponseEntity<>(new ApiResponse()
+                .message(exp.getLocalizedMessage())
+                .success(Boolean.FALSE),
+                HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<?> handleInternalServerException(Exception exp) {
         logger.error("Unexpected error occurred", exp);
-
         Throwable cause = exp;
 
         while (cause != null) {
@@ -93,7 +98,7 @@ public class GlobalExceptionHandler {
 
                 ErrorResponse errorResponse = new ErrorResponse(
                         HttpStatus.SERVICE_UNAVAILABLE.value(),
-                        "Task Create is temporarily unavailable. Please retry shortly.",
+                        "Service is temporarily unavailable. Please retry shortly.",
                         HttpStatus.SERVICE_UNAVAILABLE.name()
                 );
 

@@ -1,10 +1,7 @@
 
 package com.daily_notes.notes.entity;
 
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 @DynamoDbBean
 public class WorkSpaceEntity {
@@ -14,6 +11,7 @@ public class WorkSpaceEntity {
     private String name;
     private String createdBy;
     private String accessType;
+    private String tokenKey;
 
     @DynamoDbPartitionKey
     @DynamoDbAttribute("user_id")
@@ -33,6 +31,16 @@ public class WorkSpaceEntity {
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    @DynamoDbSecondaryPartitionKey(indexNames = "token_key")
+    @DynamoDbAttribute("token_key")
+    public String getTokenKey() {
+        return tokenKey;
+    }
+
+    public void setTokenKey(String tokenKey) {
+        this.tokenKey = tokenKey;
     }
 
     public String getName() {
