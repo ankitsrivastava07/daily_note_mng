@@ -39,14 +39,28 @@ function CreateWorkspace({ onWorkspaceCreated }) {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'userId': userId
+                    userId: userId
                 },
                 body: JSON.stringify(requestBody)
             });
 
+            const result = await response.json();
+
             if (!response.ok) {
-                throw new Error('Failed to create workspace');
+                console.log('Error:', result);
+
+                if (response.status === 409) {
+                    setError(result.message || 'Workspace already exists.');
+                    return;
+                }
+
+                throw new Error(
+                    result.message || 'Failed to create workspace'
+                );
             }
+
+            // Success
+            setMessage(result.message || 'Workspace created successfully!');
 
             const data = await response.json();
             setMessage('Workspace created successfully!');
