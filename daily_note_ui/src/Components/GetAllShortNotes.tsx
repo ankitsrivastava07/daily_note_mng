@@ -38,7 +38,7 @@ function GetAllShortNotes() {
             const response = await fetch(url.toString(), {
                 method: "GET",
                 headers: {
-                    userId: userId,
+                    userid: userId,
                     categoryId: "hgfhgf",
                     Accept: "application/json",
                 },
