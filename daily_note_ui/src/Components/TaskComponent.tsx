@@ -267,194 +267,194 @@ function TaskComponent() {
 
                 console.error("CREATE TASK ERROR:", errorMessage);
 
-                setApiError(errorMessage);
-                setMessage("");
-                return;
+                if (taskResponse.status === 409) {
+                    setApiError(errorMessage);
+                    return;
+                }
+
+                const taskResult = await taskResponse.json();
+
+                if (!taskResult.success || !taskResult.data?.id) {
+                    throw new Error(taskResult.message || "Task created but task ID was not returned");
+                }
+
+                const taskId = taskResult.data.id;
+
+                // 2. Upload Attachments if any exist
+                if (attachments.length > 0 && DMS_BASE_URL) {
+                    setUploadingImage(true);
+                    setMessage(`Uploading ${attachments.length} image(s)...`);
+                    await uploadImagesToDms(attachments, taskId);
+                }
+
+                setMessage("Task created successfully!");
+
+                // Clean up object URLs
+                attachments.forEach((att) => {
+                    if (att.previewUrl) URL.revokeObjectURL(att.previewUrl);
+                });
+
+                // Reset Form
+                setTask({
+                    title: "",
+                    content: "",
+                    priority: "MEDIUM",
+                    dueDate: "",
+                    dueTime: "",
+                    status: "PENDING",
+                    meridiem: "AM",
+                    name: "",
+                    userId: localStorage.getItem("userId") || "ankit0397"
+                });
+                setAttachments([]);
+                if (editorRef.current) {
+                    editorRef.current.innerHTML = "";
+                }
+            } catch (error) {
+                console.error("CREATE TASK FLOW ERROR:", error);
+                setApiError(error instanceof Error ? error.message : "Unable to create task");
+                setMessage(error instanceof Error ? error.message : "Unable to create task");
+            } finally {
+                setLoading(false);
+                setUploadingImage(false);
             }
+        };
 
-            const taskResult = await taskResponse.json();
-
-            if (!taskResult.success || !taskResult.data?.id) {
-                throw new Error(taskResult.message || "Task created but task ID was not returned");
-            }
-
-            const taskId = taskResult.data.id;
-
-            // 2. Upload Attachments if any exist
-            if (attachments.length > 0 && DMS_BASE_URL) {
-                setUploadingImage(true);
-                setMessage(`Uploading ${attachments.length} image(s)...`);
-                await uploadImagesToDms(attachments, taskId);
-            }
-
-            setMessage("Task created successfully!");
-
-            // Clean up object URLs
-            attachments.forEach((att) => {
-                if (att.previewUrl) URL.revokeObjectURL(att.previewUrl);
-            });
-
-            // Reset Form
-            setTask({
-                title: "",
-                content: "",
-                priority: "MEDIUM",
-                dueDate: "",
-                dueTime: "",
-                status: "PENDING",
-                meridiem: "AM",
-                name: "",
-                userId: localStorage.getItem("userId") || "ankit0397"
-            });
-            setAttachments([]);
-            if (editorRef.current) {
-                editorRef.current.innerHTML = "";
-            }
-        } catch (error) {
-            console.error("CREATE TASK FLOW ERROR:", error);
-            setApiError(error instanceof Error ? error.message : "Unable to create task");
-            setMessage(error instanceof Error ? error.message : "Unable to create task");
-        } finally {
-            setLoading(false);
-            setUploadingImage(false);
-        }
-    };
-
-    return (
-        <div className="create-task-page">
-            <div className="task-form-card">
-                <div className="task-form-header">
-                    <h1>Create Task</h1>
-                    <p>Add a new task to your daily workspace</p>
-                </div>
-
-                <form onSubmit={handleSubmit}>
-                    {/* TASK TITLE */}
-                    <div className="form-group">
-                        <label>
-                            Task Title <span className="required">*</span>
-                        </label>
-                        <input
-                            type="text"
-                            name="name"
-                            placeholder="Enter task title"
-                            value={task.name}
-                            onChange={handleChange}
-                            required
-                            disabled={loading}
-                        />
+        return (
+            <div className="create-task-page">
+                <div className="task-form-card">
+                    <div className="task-form-header">
+                        <h1>Create Task</h1>
+                        <p>Add a new task to your daily workspace</p>
                     </div>
 
-                    {apiError && (
-                        <div
-                            style={{
-                                color: "red",
-                                marginTop: "4px",
-                                fontSize: "14px",
-                            }}
-                        >
-                            {apiError}
+                    <form onSubmit={handleSubmit}>
+                        {/* TASK TITLE */}
+                        <div className="form-group">
+                            <label>
+                                Task Title <span className="required">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                name="name"
+                                placeholder="Enter task title"
+                                value={task.name}
+                                onChange={handleChange}
+                                required
+                                disabled={loading}
+                            />
                         </div>
-                    )}
 
-                    {/* DESCRIPTION */}
-                    <div className="form-group">
-                        <label>
-                            Description <span className="required">*</span>
-                        </label>
-                        <div
-                            ref={editorRef}
-                            className="description-rich-editor"
-                            contentEditable={!loading}
-                            suppressContentEditableWarning={true}
-                            data-placeholder="Type description or paste screenshot using Ctrl + V"
-                            onInput={handleDescriptionChange}
-                            onPaste={handleDescriptionPaste}
-                        />
-                        <div className="description-help">
-                            Type text and paste screenshots using <strong>Ctrl + V</strong> <span>({attachments.length}/5)</span>
-                        </div>
-                        {uploadingImage && (
-                            <div className="image-uploading">
-                                Uploading {attachments.length} image(s) to DMS...
+                        {apiError && (
+                            <div
+                                style={{
+                                    color: "red",
+                                    marginTop: "4px",
+                                    fontSize: "14px",
+                                }}
+                            >
+                                {apiError}
                             </div>
                         )}
-                    </div>
 
-                    {/* PRIORITY + STATUS */}
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label>Priority</label>
-                            <select name="priority" value={task.priority} onChange={handleChange} disabled={loading}>
-                                <option value="LOW">Low</option>
-                                <option value="MEDIUM">Medium</option>
-                                <option value="HIGH">High</option>
-                            </select>
-                        </div>
-
-                        <div className="form-group">
-                            <label>Status</label>
-                            <select name="status" value={task.status} onChange={handleChange} disabled={loading}>
-                                <option value="PENDING">Pending</option>
-                                <option value="IN_PROGRESS">In Progress</option>
-                                <option value="COMPLETED">Completed</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* DATE + TIME */}
-                    <div className="form-row">
+                        {/* DESCRIPTION */}
                         <div className="form-group">
                             <label>
-                                Due Date <span className="required">*</span>
+                                Description <span className="required">*</span>
                             </label>
-                            <input
-                                type="date"
-                                name="dueDate"
-                                value={task.dueDate}
-                                onChange={handleChange}
-                                required
-                                disabled={loading}
+                            <div
+                                ref={editorRef}
+                                className="description-rich-editor"
+                                contentEditable={!loading}
+                                suppressContentEditableWarning={true}
+                                data-placeholder="Type description or paste screenshot using Ctrl + V"
+                                onInput={handleDescriptionChange}
+                                onPaste={handleDescriptionPaste}
                             />
+                            <div className="description-help">
+                                Type text and paste screenshots using <strong>Ctrl + V</strong> <span>({attachments.length}/5)</span>
+                            </div>
+                            {uploadingImage && (
+                                <div className="image-uploading">
+                                    Uploading {attachments.length} image(s) to DMS...
+                                </div>
+                            )}
                         </div>
 
-                        <div className="form-group">
-                            <label>
-                                Due Time <span className="required">*</span>
-                            </label>
-                            <input
-                                type="time"
-                                name="dueTime"
-                                value={task.dueTime}
-                                onChange={handleChange}
-                                required
-                                disabled={loading}
-                            />
+                        {/* PRIORITY + STATUS */}
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Priority</label>
+                                <select name="priority" value={task.priority} onChange={handleChange} disabled={loading}>
+                                    <option value="LOW">Low</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="HIGH">High</option>
+                                </select>
+                            </div>
+
+                            <div className="form-group">
+                                <label>Status</label>
+                                <select name="status" value={task.status} onChange={handleChange} disabled={loading}>
+                                    <option value="PENDING">Pending</option>
+                                    <option value="IN_PROGRESS">In Progress</option>
+                                    <option value="COMPLETED">Completed</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
 
-                    {/* CREATE BUTTON */}
-                    <button
-                        type="submit"
-                        className="create-task-button"
-                        disabled={loading || uploadingImage}
-                    >
-                        {uploadingImage ? "Uploading Images..." : loading ? "Creating..." : "Create Task"}
-                    </button>
+                        {/* DATE + TIME */}
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>
+                                    Due Date <span className="required">*</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    name="dueDate"
+                                    value={task.dueDate}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={loading}
+                                />
+                            </div>
 
-                    {message && (
-                        <div
-                            className={`task-message ${apiError ? "task-message-error" : "task-message-success"
-                                }`}
-                            role={apiError ? "alert" : "status"}
+                            <div className="form-group">
+                                <label>
+                                    Due Time <span className="required">*</span>
+                                </label>
+                                <input
+                                    type="time"
+                                    name="dueTime"
+                                    value={task.dueTime}
+                                    onChange={handleChange}
+                                    required
+                                    disabled={loading}
+                                />
+                            </div>
+                        </div>
+
+                        {/* CREATE BUTTON */}
+                        <button
+                            type="submit"
+                            className="create-task-button"
+                            disabled={loading || uploadingImage}
                         >
-                            {message}
-                        </div>
-                    )}
-                </form>
-            </div>
-        </div>
-    );
-}
+                            {uploadingImage ? "Uploading Images..." : loading ? "Creating..." : "Create Task"}
+                        </button>
 
-export default TaskComponent;
+                        {message && (
+                            <div
+                                className={`task-message ${apiError ? "task-message-error" : "task-message-success"
+                                    }`}
+                                role={apiError ? "alert" : "status"}
+                            >
+                                {message}
+                            </div>
+                        )}
+                    </form>
+                </div>
+            </div>
+        );
+    }
+
+    export default TaskComponent;
