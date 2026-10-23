@@ -21,7 +21,8 @@ function TaskComponent() {
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
-    const [apiError, setApiError] = useState("");
+    const [duplicateTitleError, setDuplicateTitleError] = useState("");
+    const [messageType, setMessageType] = useState("success");
 
     const userId = localStorage.getItem("userId") || "ankit0397";
     const API_BASE_URL =
@@ -151,7 +152,8 @@ function TaskComponent() {
         }));
 
         setMessage("");
-        setApiError("");
+        if (name === "name") setDuplicateTitleError("");
+        setMessageType("success");
     };
 
     // Save rich-text description.
@@ -164,7 +166,7 @@ function TaskComponent() {
         }));
 
         setMessage("");
-        setApiError("");
+        setMessageType("success");
     };
 
     // Insert an image into the editor.
@@ -257,7 +259,8 @@ function TaskComponent() {
 
         editorRef.current.focus();
         setMessage("Image added. It will upload after task creation.");
-        setApiError("");
+        setDuplicateTitleError("");
+        setMessageType("success");
 
         return true;
     };
@@ -306,7 +309,8 @@ function TaskComponent() {
 
         setLoading(true);
         setMessage("");
-        setApiError("");
+        setDuplicateTitleError("");
+        setMessageType("success");
 
         try {
             // Read the latest editor content before submission.
@@ -322,7 +326,13 @@ function TaskComponent() {
                 throw new Error("Task title is required.");
             }
 
-            if (!taskPayload.content.trim()) {
+            const descriptionText = taskPayload.content
+                .replace(/<img\b[^>]*>/gi, " image ")
+                .replace(/<[^>]*>/g, " ")
+                .replace(/&nbsp;/gi, " ")
+                .trim();
+
+            if (!descriptionText) {
                 throw new Error("Task description is required.");
             }
 
@@ -341,10 +351,20 @@ function TaskComponent() {
 
             const taskResult = await readResponse(taskResponse);
 
-            // IMPORTANT: Stop immediately if task creation fails.
+            // Only show a field-level error for duplicate task titles.
             if (!taskResponse.ok || taskResult.success === false) {
+                const errorMessage =
+                    taskResponse.status === 409
+                        ? (taskResult.message ||
+                            "Task with the same name already exists in your account.")
+                        : (taskResult.message ||
+                            `Unable to create task (HTTP ${taskResponse.status}).`);
+
                 if (taskResponse.status === 409) {
-                    setTimeout(() => setApiError(taskResult.message), 300);
+                    setDuplicateTitleError(errorMessage);
+                } else {
+                    setMessageType("error");
+                    setMessage(errorMessage);
                 }
                 return;
             }
@@ -390,7 +410,8 @@ function TaskComponent() {
                 editorRef.current.innerHTML = "";
             }
 
-            setApiError("");
+            setDuplicateTitleError("");
+            setMessageType("success");
             setMessage("Task created successfully!");
         } catch (error) {
             console.error("CREATE TASK FLOW ERROR:", error);
@@ -400,7 +421,7 @@ function TaskComponent() {
                     ? error.message
                     : "Unable to create task.";
 
-            setApiError(errorMessage);
+            setMessageType("error");
             setMessage(errorMessage);
         } finally {
             setLoading(false);
@@ -434,7 +455,7 @@ function TaskComponent() {
                             disabled={loading}
                         />
 
-                        {apiError && (
+                        {duplicateTitleError && (
                             <div
                                 style={{
                                     color: "red",
@@ -443,7 +464,7 @@ function TaskComponent() {
                                 }}
                                 role="alert"
                             >
-                                {apiError}
+                                {duplicateTitleError}
                             </div>
                         )}
                     </div>
@@ -562,7 +583,14 @@ function TaskComponent() {
 
                     {/* RESULT MESSAGE */}
                     {message && (
-                        <div className="alert alert-danger" role="alert">
+                        <div
+                            className={`task-message ${
+                                messageType === "error"
+                                    ? "task-message-error"
+                                    : "task-message-success"
+                            }`}
+                            role={messageType === "error" ? "alert" : "status"}
+                        >
                             {message}
                         </div>
                     )}
