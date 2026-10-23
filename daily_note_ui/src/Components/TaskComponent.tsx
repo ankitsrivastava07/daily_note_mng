@@ -390,6 +390,7 @@ function TaskComponent() {
                 editorRef.current.innerHTML = "";
             }
 
+            setApiError("");
             setMessage("Task created successfully!");
         } catch (error) {
             console.error("CREATE TASK FLOW ERROR:", error);
@@ -399,6 +400,7 @@ function TaskComponent() {
                     ? error.message
                     : "Unable to create task.";
 
+            setApiError(errorMessage);
             setMessage(errorMessage);
         } finally {
             setLoading(false);
@@ -560,13 +562,7 @@ function TaskComponent() {
 
                     {/* RESULT MESSAGE */}
                     {message && (
-                        <div
-                            className={`task-message ${apiError
-                                ? "task-message-error"
-                                : "task-message-success"
-                                }`}
-                            role={apiError ? "alert" : "status"}
-                        >
+                        <div className="alert alert-danger" role="alert">
                             {message}
                         </div>
                     )}
