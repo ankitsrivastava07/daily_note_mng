@@ -61,7 +61,7 @@ public class TaskServiceImpl implements TaskService {
         token = TokenUtil.generateToken(taskDto.userId(), title);
 
         if (taskDaoService.findByTaskTokenKey(taskDto.userId(), token) != null) {
-            throw new TaskAlreadyExistException("Task with the same name already exists.");
+            throw new TaskAlreadyExistException("Task with the same name already exists in your account");
         }
 
         TaskEntity taskEntity =
