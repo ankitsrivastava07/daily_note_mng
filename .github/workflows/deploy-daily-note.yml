@@ -1,6 +1,5 @@
       - name: Verify deployed image
         env:
-          ECR_REGISTRY: 446394402725.dkr.ecr.ap-south-1.amazonaws.com
           IMAGE_TAG: ${{ github.sha }}
         run: |
           EXPECTED_DIGEST=$(aws ecr describe-images \
@@ -10,18 +9,20 @@
             --query 'imageDetails[0].imageDigest' \
             --output text)
 
-          DEPLOYED_DIGEST=$(aws lambda get-function \
+          DEPLOYED_URI=$(aws lambda get-function \
             --function-name daily_note_app \
             --region ap-south-1 \
             --query 'Code.ResolvedImageUri' \
-            --output text | awk -F'@' '{print $2}')
+            --output text)
 
-          echo "Expected digest: $EXPECTED_DIGEST"
-          echo "Deployed digest: $DEPLOYED_DIGEST"
+          EXPECTED_URI="446394402725.dkr.ecr.ap-south-1.amazonaws.com/dailynote@$EXPECTED_DIGEST"
 
-          if [ "$EXPECTED_DIGEST" = "$DEPLOYED_DIGEST" ]; then
+          echo "Expected image: $EXPECTED_URI"
+          echo "Deployed image: $DEPLOYED_URI"
+
+          if [ "$EXPECTED_URI" = "$DEPLOYED_URI" ]; then
             echo "Lambda image verification successful."
           else
-            echo "ERROR: Lambda image digest does not match the pushed image."
+            echo "ERROR: Lambda image digest does not match."
             exit 1
           fi
