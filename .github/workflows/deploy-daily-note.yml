@@ -10,7 +10,7 @@ on:
 
 env:
   AWS_REGION: ap-south-1
-  ECR_REPOSITORY: dailynoteapp
+  ECR_REPOSITORY: dailynote
   LAMBDA_FUNCTION: daily_note_app
 
 jobs:
