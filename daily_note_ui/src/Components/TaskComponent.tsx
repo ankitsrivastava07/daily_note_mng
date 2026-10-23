@@ -1,8 +1,9 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import "./CSS/TaskComponent.css";
 
 function TaskComponent() {
     const editorRef = useRef(null);
+    const attachmentsRef = useRef([]);
 
     const [task, setTask] = useState({
         title: "",
@@ -23,46 +24,101 @@ function TaskComponent() {
     const [apiError, setApiError] = useState("");
 
     const userId = localStorage.getItem("userId") || "ankit0397";
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:9091";
+    const API_BASE_URL =
+        import.meta.env.VITE_API_BASE_URL || "http://localhost:9091";
     const DMS_BASE_URL = import.meta.env.VITE_DMS_API_BASE_URL;
 
-    // =========================================================
-    // HELPER: GET FILE EXTENSION
-    // =========================================================
-    const getFileExtension = (contentType) => {
-        if (!contentType) return "png";
-        const parts = contentType.split("/");
-        return parts[1] || "png";
+    // Keep attachment state and ref synchronized.
+    const updateAttachments = (updater) => {
+        setAttachments((previous) => {
+            const next =
+                typeof updater === "function" ? updater(previous) : updater;
+
+            attachmentsRef.current = next;
+            return next;
+        });
     };
 
-    // =========================================================
-    // HELPER: UPLOAD IMAGES TO DMS
-    // =========================================================
+    // Release temporary browser image URLs.
+    const cleanupAttachments = (items) => {
+        items.forEach((attachment) => {
+            if (attachment.previewUrl) {
+                URL.revokeObjectURL(attachment.previewUrl);
+            }
+        });
+    };
+
+    useEffect(() => {
+        return () => {
+            cleanupAttachments(attachmentsRef.current);
+        };
+    }, []);
+
+    // Extract file extension.
+    const getFileExtension = (contentType) => {
+        const extension = contentType?.split("/")[1]?.split("+")[0];
+        return extension || "png";
+    };
+
+    // Parse API responses safely, including plain-text errors.
+    const readResponse = async (response) => {
+        const responseText = await response.text();
+
+        if (!responseText) {
+            return {};
+        }
+
+        try {
+            return JSON.parse(responseText);
+        } catch {
+            return { message: responseText };
+        }
+    };
+
+    // Upload images to DMS using presigned URLs.
     const uploadImagesToDms = async (imagesToUpload, taskId) => {
+        if (!DMS_BASE_URL) {
+            throw new Error(
+                "DMS API URL is not configured. Configure VITE_DMS_API_BASE_URL."
+            );
+        }
+
         const uploadedResults = [];
+
         for (const attachment of imagesToUpload) {
-            // 1. Get Presigned URL for each file
-            const presignedRes = await fetch(
-                `${DMS_BASE_URL}/api/v1/${taskId}/dms/presigned?fileName=${encodeURIComponent(attachment.fileName)}`,
+            // 1. Request presigned URL.
+            const presignedResponse = await fetch(
+                `${DMS_BASE_URL}/api/v1/${encodeURIComponent(
+                    taskId
+                )}/dms/presigned?fileName=${encodeURIComponent(
+                    attachment.fileName
+                )}`,
                 {
                     method: "GET",
                     headers: { userId },
                 }
             );
 
-            if (!presignedRes.ok) {
-                throw new Error(`Failed to get presigned URL for ${attachment.fileName}`);
+            const presignedData = await readResponse(presignedResponse);
+
+            if (!presignedResponse.ok) {
+                throw new Error(
+                    presignedData.message ||
+                    `Failed to get upload URL for ${attachment.fileName}`
+                );
             }
 
-            const presignedData = await presignedRes.json();
-            const uploadUrl = presignedData.data?.uploadUrl || presignedData.uploadUrl;
+            const uploadUrl =
+                presignedData.data?.uploadUrl || presignedData.uploadUrl;
 
             if (!uploadUrl) {
-                throw new Error(`Upload URL not found for ${attachment.fileName}`);
+                throw new Error(
+                    `Upload URL not found for ${attachment.fileName}`
+                );
             }
 
-            // 2. Upload actual file to S3 / Storage via Presigned URL
-            const uploadRes = await fetch(uploadUrl, {
+            // 2. Upload the file directly to S3.
+            const uploadResponse = await fetch(uploadUrl, {
                 method: "PUT",
                 headers: {
                     "Content-Type": attachment.contentType,
@@ -70,104 +126,76 @@ function TaskComponent() {
                 body: attachment.file,
             });
 
-            if (!uploadRes.ok) {
-                throw new Error(`Failed to upload ${attachment.fileName} to storage`);
+            if (!uploadResponse.ok) {
+                throw new Error(
+                    `Failed to upload ${attachment.fileName} to storage. HTTP ${uploadResponse.status}`
+                );
             }
 
-            uploadedResults.push({ fileName: attachment.fileName, status: "SUCCESS" });
+            uploadedResults.push({
+                fileName: attachment.fileName,
+                status: "SUCCESS",
+            });
         }
+
         return uploadedResults;
     };
 
-    // =========================================================
-    // NORMAL FORM CHANGE
-    // =========================================================
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setTask((prev) => ({
-            ...prev,
+    // Handle normal form fields.
+    const handleChange = (event) => {
+        const { name, value } = event.target;
+
+        setTask((previous) => ({
+            ...previous,
             [name]: value,
         }));
+
         setMessage("");
         setApiError("");
     };
 
-    // =========================================================
-    // DESCRIPTION CHANGE
-    // =========================================================
+    // Save rich-text description.
     const handleDescriptionChange = () => {
         if (!editorRef.current) return;
-        setTask((prev) => ({
-            ...prev,
+
+        setTask((previous) => ({
+            ...previous,
             content: editorRef.current.innerHTML,
         }));
+
         setMessage("");
+        setApiError("");
     };
 
-    // =========================================================
-    // UPDATE EDITOR CONTENT
-    // =========================================================
-    const updateEditorContent = () => {
-        if (!editorRef.current) return;
-        setTask((prev) => ({
-            ...prev,
-            content: editorRef.current.innerHTML,
-        }));
-    };
-
-    // =========================================================
-    // PASTE HANDLER
-    // =========================================================
-    const handleDescriptionPaste = (e) => {
-        const items = Array.from(e.clipboardData?.items || []);
-        const imageFiles = items
-            .filter((item) => item.kind === "file" && item.type?.startsWith("image/"))
-            .map((item) => item.getAsFile())
-            .filter(Boolean);
-
-        if (imageFiles.length === 0) return;
-
-        e.preventDefault();
-
-        const availableSlots = 5 - attachments.length;
-        if (availableSlots <= 0) {
-            setMessage("Maximum 5 images are allowed.");
-            return;
-        }
-
-        if (imageFiles.length > availableSlots) {
-            setMessage(`Maximum 5 images are allowed. You can add only ${availableSlots} more image(s).`);
-            return;
-        }
-
-        imageFiles.forEach((imageFile) => {
-            insertImageIntoEditor(imageFile);
-        });
-    };
-
-    // =========================================================
-    // INSERT IMAGE INTO EDITOR
-    // =========================================================
+    // Insert an image into the editor.
     const insertImageIntoEditor = (file) => {
-        if (!editorRef.current) return;
+        if (!editorRef.current || !file) return false;
 
-        if (!file || !file.type || !file.type.startsWith("image/")) {
-            setMessage("Only image files are supported");
-            return;
+        if (!file.type?.startsWith("image/")) {
+            setMessage("Only image files are supported.");
+            return false;
         }
 
         const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
         if (file.size > MAX_FILE_SIZE) {
-            setMessage("Image size must be less than 10 MB");
-            return;
+            setMessage("Image size must be less than 10 MB.");
+            return false;
+        }
+
+        if (attachmentsRef.current.length >= 5) {
+            setMessage("Maximum 5 images are allowed.");
+            return false;
         }
 
         const tempId = crypto.randomUUID();
-        const extension = getFileExtension(file.type);
-        const fileName = `pasted-${Date.now()}-${tempId}.${extension}`;
+        const fileName = `pasted-${Date.now()}-${tempId}.${getFileExtension(
+            file.type
+        )}`;
         const previewUrl = URL.createObjectURL(file);
 
         const imageElement = document.createElement("img");
+
         imageElement.src = previewUrl;
         imageElement.alt = fileName;
         imageElement.className = "description-pasted-image";
@@ -183,6 +211,7 @@ function TaskComponent() {
 
         if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
+
             if (editorRef.current.contains(range.commonAncestorContainer)) {
                 range.deleteContents();
                 range.insertNode(imageElement);
@@ -195,6 +224,7 @@ function TaskComponent() {
                 const newRange = document.createRange();
                 newRange.setStart(newLine, 0);
                 newRange.collapse(true);
+
                 selection.removeAllRanges();
                 selection.addRange(newRange);
             }
@@ -202,259 +232,356 @@ function TaskComponent() {
 
         if (!insertedAtCursor) {
             editorRef.current.appendChild(imageElement);
+
             const newLine = document.createElement("div");
             newLine.innerHTML = "<br>";
             editorRef.current.appendChild(newLine);
         }
 
-        setAttachments((prev) => {
-            if (prev.length >= 5) {
-                imageElement.remove();
-                URL.revokeObjectURL(previewUrl);
-                setMessage("Maximum 5 images are allowed.");
-                return prev;
-            }
+        updateAttachments((previous) => [
+            ...previous,
+            {
+                tempId,
+                file,
+                fileName,
+                contentType: file.type,
+                fileSize: file.size,
+                previewUrl,
+            },
+        ]);
 
-            return [
-                ...prev,
-                {
-                    tempId,
-                    file,
-                    fileName,
-                    contentType: file.type,
-                    fileSize: file.size,
-                    previewUrl,
-                },
-            ];
-        });
+        setTask((previous) => ({
+            ...previous,
+            content: editorRef.current.innerHTML,
+        }));
 
-        updateEditorContent();
         editorRef.current.focus();
         setMessage("Image added. It will upload after task creation.");
+        setApiError("");
+
+        return true;
     };
 
-    // =========================================================
-    // HANDLE FORM SUBMISSION
-    // =========================================================
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    // Paste screenshots using Ctrl + V.
+    const handleDescriptionPaste = (event) => {
+        const items = Array.from(event.clipboardData?.items || []);
+
+        const imageFiles = items
+            .filter(
+                (item) =>
+                    item.kind === "file" && item.type?.startsWith("image/")
+            )
+            .map((item) => item.getAsFile())
+            .filter(Boolean);
+
+        if (imageFiles.length === 0) return;
+
+        event.preventDefault();
+
+        const availableSlots = 5 - attachmentsRef.current.length;
+
+        if (availableSlots <= 0) {
+            setMessage("Maximum 5 images are allowed.");
+            return;
+        }
+
+        const filesToInsert = imageFiles.slice(0, availableSlots);
+
+        filesToInsert.forEach((file) => {
+            insertImageIntoEditor(file);
+        });
+
+        if (imageFiles.length > availableSlots) {
+            setMessage(
+                `Maximum 5 images are allowed. Only ${availableSlots} more image(s) can be added.`
+            );
+        }
+    };
+
+    // Submit task and upload its attachments.
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        if (loading) return;
+
         setLoading(true);
         setMessage("");
         setApiError("");
 
         try {
-            // 1. Create Task API Call
-            const taskResponse = await fetch(`${API_BASE_URL}/api/v1/task`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    userId: userId,
-                },
-                body: JSON.stringify(task),
-            });
+            // Read the latest editor content before submission.
+            const taskPayload = {
+                ...task,
+                content: editorRef.current
+                    ? editorRef.current.innerHTML
+                    : task.content,
+                userId,
+            };
 
-            if (!taskResponse.ok) {
-                const responseText = await taskResponse.text();
+            if (!taskPayload.name.trim()) {
+                throw new Error("Task title is required.");
+            }
 
-                let errorMessage = "Unable to create task.";
+            if (!taskPayload.content.trim()) {
+                throw new Error("Task description is required.");
+            }
 
-                try {
-                    const errorData = JSON.parse(responseText);
-                    errorMessage = errorData.message || errorMessage;
-                } catch {
-                    errorMessage = responseText || errorMessage;
+            // 1. Create the task.
+            const taskResponse = await fetch(
+                `${API_BASE_URL}/api/v1/task`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        userId,
+                    },
+                    body: JSON.stringify(taskPayload),
                 }
+            );
 
-                console.error("CREATE TASK ERROR:", errorMessage);
+            const taskResult = await readResponse(taskResponse);
+
+            // IMPORTANT: Stop immediately if task creation fails.
+            if (!taskResponse.ok || taskResult.success === false) {
+                let errorMessage =
+                    taskResult.message || "Unable to create task.";
 
                 if (taskResponse.status === 409) {
-                    setApiError(errorMessage);
-                    return;
+                    errorMessage =
+                        taskResult.message ||
+                        "Task with the same name already exists in your account.";
+                    setTimeout(() => setApiError(errorMessage), 300);
                 }
-
-                const taskResult = await taskResponse.json();
-
-                if (!taskResult.success || !taskResult.data?.id) {
-                    throw new Error(taskResult.message || "Task created but task ID was not returned");
-                }
-
-                const taskId = taskResult.data.id;
-
-                // 2. Upload Attachments if any exist
-                if (attachments.length > 0 && DMS_BASE_URL) {
-                    setUploadingImage(true);
-                    setMessage(`Uploading ${attachments.length} image(s)...`);
-                    await uploadImagesToDms(attachments, taskId);
-                }
-
-                setMessage("Task created successfully!");
-
-                // Clean up object URLs
-                attachments.forEach((att) => {
-                    if (att.previewUrl) URL.revokeObjectURL(att.previewUrl);
-                });
-
-                // Reset Form
-                setTask({
-                    title: "",
-                    content: "",
-                    priority: "MEDIUM",
-                    dueDate: "",
-                    dueTime: "",
-                    status: "PENDING",
-                    meridiem: "AM",
-                    name: "",
-                    userId: localStorage.getItem("userId") || "ankit0397"
-                });
-                setAttachments([]);
-                if (editorRef.current) {
-                    editorRef.current.innerHTML = "";
-                }
-            } catch (error) {
-                console.error("CREATE TASK FLOW ERROR:", error);
-                setApiError(error instanceof Error ? error.message : "Unable to create task");
-                setMessage(error instanceof Error ? error.message : "Unable to create task");
-            } finally {
-                setLoading(false);
-                setUploadingImage(false);
+                return;
             }
-        };
 
-        return (
-            <div className="create-task-page">
-                <div className="task-form-card">
-                    <div className="task-form-header">
-                        <h1>Create Task</h1>
-                        <p>Add a new task to your daily workspace</p>
+            const taskId = taskResult.data?.id;
+
+            if (!taskId) {
+                throw new Error(
+                    "Task creation response did not contain a task ID."
+                );
+            }
+
+            // 2. Upload attachments after successful task creation.
+            const currentAttachments = [...attachmentsRef.current];
+
+            if (currentAttachments.length > 0) {
+                setUploadingImage(true);
+
+                setMessage(
+                    `Task created. Uploading ${currentAttachments.length} image(s)...`
+                );
+
+                await uploadImagesToDms(currentAttachments, taskId);
+            }
+
+            // 3. Success: clean up and reset.
+            cleanupAttachments(currentAttachments);
+            updateAttachments([]);
+
+            setTask({
+                title: "",
+                content: "",
+                priority: "MEDIUM",
+                dueDate: "",
+                dueTime: "",
+                status: "PENDING",
+                meridiem: "AM",
+                name: "",
+                userId,
+            });
+
+            if (editorRef.current) {
+                editorRef.current.innerHTML = "";
+            }
+
+            setApiError("");
+            setMessage("Task created successfully!");
+        } catch (error) {
+            console.error("CREATE TASK FLOW ERROR:", error);
+
+            const errorMessage =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to create task.";
+
+            setApiError(errorMessage);
+            setMessage(errorMessage);
+        } finally {
+            setLoading(false);
+            setUploadingImage(false);
+        }
+    };
+
+    return (
+        <div className="create-task-page">
+            <div className="task-form-card">
+                <div className="task-form-header">
+                    <h1>Create Task</h1>
+                    <p>Add a new task to your daily workspace</p>
+                </div>
+
+                <form onSubmit={handleSubmit}>
+                    {/* TASK TITLE */}
+                    <div className="form-group">
+                        <label htmlFor="task-title">
+                            Task Title <span className="required">*</span>
+                        </label>
+
+                        <input
+                            id="task-title"
+                            type="text"
+                            name="name"
+                            placeholder="Enter task title"
+                            value={task.name}
+                            onChange={handleChange}
+                            required
+                            disabled={loading}
+                        />
+
+                        {apiError && (
+                            <div
+                                style={{
+                                    color: "red",
+                                    marginTop: "5px",
+                                    fontSize: "14px",
+                                }}
+                                role="alert"
+                            >
+                                {apiError}
+                            </div>
+                        )}
                     </div>
 
-                    <form onSubmit={handleSubmit}>
-                        {/* TASK TITLE */}
+                    {/* DESCRIPTION */}
+                    <div className="form-group">
+                        <label>
+                            Description <span className="required">*</span>
+                        </label>
+
+                        <div
+                            ref={editorRef}
+                            className="description-rich-editor"
+                            contentEditable={!loading}
+                            suppressContentEditableWarning
+                            data-placeholder="Type description or paste screenshot using Ctrl + V"
+                            onInput={handleDescriptionChange}
+                            onPaste={handleDescriptionPaste}
+                        />
+
+                        <div className="description-help">
+                            Type text and paste screenshots using{" "}
+                            <strong>Ctrl + V</strong>{" "}
+                            <span>({attachments.length}/5)</span>
+                        </div>
+
+                        {uploadingImage && (
+                            <div className="image-uploading">
+                                Uploading images to DMS...
+                            </div>
+                        )}
+                    </div>
+
+                    {/* PRIORITY + STATUS */}
+                    <div className="form-row">
                         <div className="form-group">
-                            <label>
-                                Task Title <span className="required">*</span>
+                            <label htmlFor="task-priority">Priority</label>
+
+                            <select
+                                id="task-priority"
+                                name="priority"
+                                value={task.priority}
+                                onChange={handleChange}
+                                disabled={loading}
+                            >
+                                <option value="LOW">Low</option>
+                                <option value="MEDIUM">Medium</option>
+                                <option value="HIGH">High</option>
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="task-status">Status</label>
+
+                            <select
+                                id="task-status"
+                                name="status"
+                                value={task.status}
+                                onChange={handleChange}
+                                disabled={loading}
+                            >
+                                <option value="PENDING">Pending</option>
+                                <option value="IN_PROGRESS">In Progress</option>
+                                <option value="COMPLETED">Completed</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* DATE + TIME */}
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label htmlFor="task-due-date">
+                                Due Date <span className="required">*</span>
                             </label>
+
                             <input
-                                type="text"
-                                name="name"
-                                placeholder="Enter task title"
-                                value={task.name}
+                                id="task-due-date"
+                                type="date"
+                                name="dueDate"
+                                value={task.dueDate}
                                 onChange={handleChange}
                                 required
                                 disabled={loading}
                             />
                         </div>
 
-                        {apiError && (
-                            <div
-                                style={{
-                                    color: "red",
-                                    marginTop: "4px",
-                                    fontSize: "14px",
-                                }}
-                            >
-                                {apiError}
-                            </div>
-                        )}
-
-                        {/* DESCRIPTION */}
                         <div className="form-group">
-                            <label>
-                                Description <span className="required">*</span>
+                            <label htmlFor="task-due-time">
+                                Due Time <span className="required">*</span>
                             </label>
-                            <div
-                                ref={editorRef}
-                                className="description-rich-editor"
-                                contentEditable={!loading}
-                                suppressContentEditableWarning={true}
-                                data-placeholder="Type description or paste screenshot using Ctrl + V"
-                                onInput={handleDescriptionChange}
-                                onPaste={handleDescriptionPaste}
+
+                            <input
+                                id="task-due-time"
+                                type="time"
+                                name="dueTime"
+                                value={task.dueTime}
+                                onChange={handleChange}
+                                required
+                                disabled={loading}
                             />
-                            <div className="description-help">
-                                Type text and paste screenshots using <strong>Ctrl + V</strong> <span>({attachments.length}/5)</span>
-                            </div>
-                            {uploadingImage && (
-                                <div className="image-uploading">
-                                    Uploading {attachments.length} image(s) to DMS...
-                                </div>
-                            )}
                         </div>
+                    </div>
 
-                        {/* PRIORITY + STATUS */}
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>Priority</label>
-                                <select name="priority" value={task.priority} onChange={handleChange} disabled={loading}>
-                                    <option value="LOW">Low</option>
-                                    <option value="MEDIUM">Medium</option>
-                                    <option value="HIGH">High</option>
-                                </select>
-                            </div>
+                    {/* CREATE BUTTON */}
+                    <button
+                        type="submit"
+                        className="create-task-button"
+                        disabled={loading}
+                    >
+                        {uploadingImage
+                            ? "Uploading Images..."
+                            : loading
+                                ? "Creating..."
+                                : "Create Task"}
+                    </button>
 
-                            <div className="form-group">
-                                <label>Status</label>
-                                <select name="status" value={task.status} onChange={handleChange} disabled={loading}>
-                                    <option value="PENDING">Pending</option>
-                                    <option value="IN_PROGRESS">In Progress</option>
-                                    <option value="COMPLETED">Completed</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        {/* DATE + TIME */}
-                        <div className="form-row">
-                            <div className="form-group">
-                                <label>
-                                    Due Date <span className="required">*</span>
-                                </label>
-                                <input
-                                    type="date"
-                                    name="dueDate"
-                                    value={task.dueDate}
-                                    onChange={handleChange}
-                                    required
-                                    disabled={loading}
-                                />
-                            </div>
-
-                            <div className="form-group">
-                                <label>
-                                    Due Time <span className="required">*</span>
-                                </label>
-                                <input
-                                    type="time"
-                                    name="dueTime"
-                                    value={task.dueTime}
-                                    onChange={handleChange}
-                                    required
-                                    disabled={loading}
-                                />
-                            </div>
-                        </div>
-
-                        {/* CREATE BUTTON */}
-                        <button
-                            type="submit"
-                            className="create-task-button"
-                            disabled={loading || uploadingImage}
+                    {/* RESULT MESSAGE */}
+                    {message && (
+                        <div
+                            className={`task-message ${apiError
+                                ? "task-message-error"
+                                : "task-message-success"
+                                }`}
+                            role={apiError ? "alert" : "status"}
                         >
-                            {uploadingImage ? "Uploading Images..." : loading ? "Creating..." : "Create Task"}
-                        </button>
-
-                        {message && (
-                            <div
-                                className={`task-message ${apiError ? "task-message-error" : "task-message-success"
-                                    }`}
-                                role={apiError ? "alert" : "status"}
-                            >
-                                {message}
-                            </div>
-                        )}
-                    </form>
-                </div>
+                            {message}
+                        </div>
+                    )}
+                </form>
             </div>
-        );
-    }
+        </div>
+    );
+}
 
-    export default TaskComponent;
+export default TaskComponent;
