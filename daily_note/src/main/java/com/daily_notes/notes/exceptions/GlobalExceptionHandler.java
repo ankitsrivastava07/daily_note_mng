@@ -3,6 +3,7 @@ package com.daily_notes.notes.exceptions;
 import com.daily_notes.notes.dto.ErrorResponse;
 import com.daily_notes.notes.exceptions.exception.DynamoDbIndexUnavailableException;
 import com.daily_notes.notes.exceptions.exception.ShortEntityAlreadyExistException;
+import com.daily_notes.notes.exceptions.exception.TaskAlreadyExistException;
 import com.daily_notes.notes.records.ApiResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,6 +67,15 @@ public class GlobalExceptionHandler {
                 .message("Please retry your request shortly.")
                 .success(Boolean.FALSE),
                 HttpStatus.SERVICE_UNAVAILABLE);
+    }
+
+    @ExceptionHandler(TaskAlreadyExistException.class)
+    public ResponseEntity<?> handleTaskAlreadyExistException(TaskAlreadyExistException exp) {
+        logger.info("Task Already Exist Exception Occurred {}", exp.getMessage());
+        return new ResponseEntity<>(new ApiResponse()
+                .message(exp.getLocalizedMessage())
+                .success(Boolean.FALSE),
+                HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler(Exception.class)

@@ -20,6 +20,7 @@ function CreateTask() {
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
+    const [apiError, setApiError] = useState("");
 
     const userId =
         localStorage.getItem("userId") || "ankit0397";
@@ -723,13 +724,13 @@ function CreateTask() {
 
             const attachment =
                 attachmentsToUpload[
-                    index
+                index
                 ];
 
 
             const uploadUrl =
                 presignedUrls[
-                    index
+                index
                 ];
 
 
@@ -902,7 +903,6 @@ function CreateTask() {
                 {
                     method:
                         "POST",
-
                     headers: {
 
                         "Content-Type":
@@ -925,6 +925,7 @@ function CreateTask() {
             const errorText =
                 await response.text();
 
+            setApiError(errorText.message);
 
             console.error(
                 "SAVE DOCUMENT METADATA ERROR:",
@@ -1045,7 +1046,7 @@ function CreateTask() {
     ) => {
 
         switch (
-            contentType
+        contentType
         ) {
 
             case "image/jpeg":
@@ -1430,7 +1431,7 @@ function CreateTask() {
                         );
 
                 } catch (
-                    uploadError
+                uploadError
                 ) {
 
                     console.error(
@@ -1516,7 +1517,7 @@ function CreateTask() {
 
 
         } catch (
-            error
+        error
         ) {
 
             console.error(
@@ -1582,12 +1583,10 @@ function CreateTask() {
 
                         <label>
                             Task Title{" "}
-
                             <span className="required">
                                 *
                             </span>
                         </label>
-
 
                         <input
                             type="text"
@@ -1604,6 +1603,12 @@ function CreateTask() {
                                 loading
                             }
                         />
+
+                        {isSuccess === false && (
+                            <div style={{ color: 'red', marginTop: '5px', fontSize: '14px' }}>
+                                {apiError || "An error occurred while saving the note. Please try again."}
+                            </div>
+                        )}
 
                     </div>
 
@@ -1781,7 +1786,6 @@ function CreateTask() {
 
                             </label>
 
-
                             <input
                                 type="date"
                                 name="dueDate"
@@ -1796,12 +1800,9 @@ function CreateTask() {
                                     loading
                                 }
                             />
-
                         </div>
 
-
                         <div className="form-group">
-
                             <label>
 
                                 Due Time{" "}
@@ -1811,7 +1812,6 @@ function CreateTask() {
                                 </span>
 
                             </label>
-
 
                             <input
                                 type="time"
@@ -1869,9 +1869,7 @@ function CreateTask() {
                         message && (
 
                             <div className="task-message">
-
                                 {message}
-
                             </div>
                         )
                     }

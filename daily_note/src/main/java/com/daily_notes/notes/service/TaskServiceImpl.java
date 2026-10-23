@@ -4,6 +4,7 @@ import com.daily_notes.notes.dao.TaskDaoService;
 import com.daily_notes.notes.dto.TaskDto;
 import com.daily_notes.notes.entity.OutboxEventEntity;
 import com.daily_notes.notes.entity.TaskEntity;
+import com.daily_notes.notes.exceptions.exception.TaskAlreadyExistException;
 import com.daily_notes.notes.mapper.CustomMapper;
 import com.daily_notes.notes.records.ApiResponse;
 import com.daily_notes.notes.utility.constant.TokenUtil;
@@ -15,6 +16,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.TransactWriteItemsEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
+
 import java.time.Instant;
 import java.util.UUID;
 
@@ -59,9 +61,7 @@ public class TaskServiceImpl implements TaskService {
         token = TokenUtil.generateToken(taskDto.userId(), title);
 
         if (taskDaoService.findByTaskTokenKey(taskDto.userId(), token) != null) {
-            return new ApiResponse()
-                    .success(Boolean.FALSE)
-                    .message("Task with the same name already exists.");
+            throw new TaskAlreadyExistException("Task with the same name already exists.");
         }
 
         TaskEntity taskEntity =
