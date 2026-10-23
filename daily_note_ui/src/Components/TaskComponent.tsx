@@ -21,6 +21,7 @@ function CreateTask() {
     const [loading, setLoading] = useState(false);
     const [uploadingImage, setUploadingImage] = useState(false);
     const [apiError, setApiError] = useState("");
+    const [isSuccess, setIsSuccess] = useState(false);
 
     const userId =
         localStorage.getItem("userId") || "ankit0397";
@@ -582,16 +583,14 @@ function CreateTask() {
 
 
         if (!response.ok) {
-
             const errorText =
-                await response.text();
+                await response.json();
 
-
+            setApiError(errorText.message);
             console.error(
                 "PRESIGNED API ERROR:",
                 errorText
             );
-
 
             throw new Error(
                 "Unable to get presigned URLs"
@@ -926,18 +925,16 @@ function CreateTask() {
                 await response.text();
 
             setApiError(errorText.message);
-
+            setIsSuccess(false);
             console.error(
                 "SAVE DOCUMENT METADATA ERROR:",
                 errorText
             );
 
-
             throw new Error(
                 "Files uploaded to S3, but document metadata could not be saved"
             );
         }
-
 
         const result =
             await response.json();
