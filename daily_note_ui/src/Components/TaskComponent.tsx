@@ -343,14 +343,9 @@ function TaskComponent() {
 
             // IMPORTANT: Stop immediately if task creation fails.
             if (!taskResponse.ok || taskResult.success === false) {
-                let errorMessage =
-                    taskResult.message || "Unable to create task.";
-
                 if (taskResponse.status === 409) {
-                    errorMessage =
-                        taskResult.message ||
-                        "Task with the same name already exists in your account.";
-                    setTimeout(() => setApiError(errorMessage), 300);
+                    "Task with the same name already exists in your account.";
+                    setTimeout(() => setApiError(taskResult.message), 300);
                 }
                 return;
             }
