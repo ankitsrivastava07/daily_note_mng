@@ -109,12 +109,6 @@
             <artifactId>spring-cloud-aws-starter-secrets-manager</artifactId>
         </dependency>
 
-        <!-- Kafka -->
-        <dependency>
-            <groupId>org.springframework.kafka</groupId>
-            <artifactId>spring-kafka</artifactId>
-        </dependency>
-
         <!-- Resilience4j -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
