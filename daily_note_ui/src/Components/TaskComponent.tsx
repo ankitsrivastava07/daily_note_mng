@@ -344,7 +344,6 @@ function TaskComponent() {
             // IMPORTANT: Stop immediately if task creation fails.
             if (!taskResponse.ok || taskResult.success === false) {
                 if (taskResponse.status === 409) {
-                    "Task with the same name already exists in your account.";
                     setTimeout(() => setApiError(taskResult.message), 300);
                 }
                 return;
@@ -391,7 +390,6 @@ function TaskComponent() {
                 editorRef.current.innerHTML = "";
             }
 
-            setApiError("");
             setMessage("Task created successfully!");
         } catch (error) {
             console.error("CREATE TASK FLOW ERROR:", error);
@@ -401,7 +399,6 @@ function TaskComponent() {
                     ? error.message
                     : "Unable to create task.";
 
-            setApiError(errorMessage);
             setMessage(errorMessage);
         } finally {
             setLoading(false);
