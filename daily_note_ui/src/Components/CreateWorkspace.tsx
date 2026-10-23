@@ -35,7 +35,7 @@ function CreateWorkspace({ onWorkspaceCreated }) {
             setMessage('');
             setError('');
 
-            const response = await fetch(`${API_BASE_URL}/api/v1/workspaces`, {
+            const response = await fetch(`${API_BASE_URL}/api/v1/work-space`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -130,10 +130,10 @@ function WorkspaceList({ refreshTrigger, onSelectWorkspace }) {
         const fetchWorkspaces = async () => {
             try {
                 setLoading(true);
-                const response = await fetch(`${API_BASE_URL}/api/v1/workspaces`, {
+                const response = await fetch(`${API_BASE_URL}/api/v1/work-space`, {
                     method: 'GET',
                     headers: {
-                        'X-User-Id': userId
+                        'userId': userId
                     }
                 });
 
