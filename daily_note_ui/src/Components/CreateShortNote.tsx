@@ -5,7 +5,7 @@ function CreateShortNote() {
     const [inputValue, setInputValue] = useState({ title: '', content: '', categoryId: "others", userId: 'ankit0397' });
     const [isSuccess, setIsSuccess] = useState(null);
     const [formErrors, setFormErrors] = useState({});
-    const [apiError, setApiError] = useState("");
+    const [apiError, setApiError] = useState();
 
     // A mapping helper to show the user-friendly label on the dropdown button
     const categoryLabels = {
@@ -67,7 +67,6 @@ function CreateShortNote() {
     const handleSubmit = (event) => {
         event.preventDefault();
         const isValid = validate();
-
         if (!isValid) {
             setIsSuccess(null);
             return;
