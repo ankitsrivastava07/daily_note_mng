@@ -59,7 +59,7 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
 
         // Query GSI instead of the primary table
         DynamoDbIndex<ShortNoteEntity> index =
-                table.index("user-createdAt-index");
+                table.index("shortnote_createdAt_index");
 
         QueryEnhancedRequest.Builder builder =
                 QueryEnhancedRequest.builder()
