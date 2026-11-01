@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
@@ -29,26 +30,54 @@ public class ShortNoteServiceImpl implements ShortNoteService {
     }
 
     @Override
-    public ApiResponse createShortNote(CreateShortNoteDto createShortNoteDto) throws Exception {
-        logger.info("Creating short note: {}", createShortNoteDto);
-        ShortNoteEntity entity = CustomMapper.mapToEntity(createShortNoteDto, ShortNoteEntity.class);
+    public ApiResponse createShortNote(
+            CreateShortNoteDto createShortNoteDto) throws Exception {
+
+        logger.info("Creating short note for userId: {}",
+                createShortNoteDto.userId());
+
+        ShortNoteEntity entity =
+                CustomMapper.mapToEntity(
+                        createShortNoteDto,
+                        ShortNoteEntity.class
+                );
+
         entity.setId(UUID.randomUUID().toString());
-        String token = TokenUtil.generateToken(createShortNoteDto.userId(), createShortNoteDto.title());
-        if (shortNoteDao.findByHashToken(createShortNoteDto.userId(), token) != null) {
-            logger.info(
-                    "Duplicate short note title detected for userId: {} and title: {}",
-                    createShortNoteDto.userId(),
-                    createShortNoteDto.title()
+
+        // Always generate creation timestamp on backend
+        Instant createdAt = Instant.now();
+        entity.setCreatedAt(createdAt);
+        entity.setUpdateAt(createdAt);
+
+        String token = TokenUtil.generateToken(
+                createShortNoteDto.userId(),
+                createShortNoteDto.title()
+        );
+
+        if (shortNoteDao.findByHashToken(
+                createShortNoteDto.userId(), token) != null) {
+
+            throw new ShortEntityAlreadyExistException(
+                    "You already have a short note with this title. " +
+                            "Please choose a different title."
             );
-            throw new ShortEntityAlreadyExistException("You already have a short note with " +
-                    "this title in your account. Please choose a different title.");
         }
+
         entity.setUniqueToken(token);
+
+        // Log exact information needed for future recovery
+        logger.info(
+                "SHORT_NOTE_CREATED userId={} noteId={} createdAt={}",
+                entity.getUserId(),
+                entity.getId(),
+                entity.getCreatedAt()
+        );
+
         shortNoteDao.createShortNote(entity);
-        return new
-                ApiResponse().
-                success(Boolean.TRUE).
-                message("Success");
+
+        return new ApiResponse()
+                .success(Boolean.TRUE)
+                .message("Success");
     }
 
     @Override

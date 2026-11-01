@@ -27,7 +27,6 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
 
     @Override
     public void createShortNote(ShortNoteEntity shortNoteEntity) {
-        shortNoteEntity.setId(IdGenerator.generateId());
         table.putItem(shortNoteEntity);
     }
 
