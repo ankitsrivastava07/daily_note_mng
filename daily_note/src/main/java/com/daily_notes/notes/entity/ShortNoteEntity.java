@@ -1,12 +1,7 @@
 
 package com.daily_notes.notes.entity;
 
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 import java.time.Instant;
 
@@ -44,7 +39,9 @@ public class ShortNoteEntity extends BaseEntity {
     }
 
     @DynamoDbAttribute("unique_token")
-    @DynamoDbSecondarySortKey(indexNames = "UserUniqueTokenIndex")
+    @DynamoDbSecondarySortKey(
+            indexNames = "UserUniqueTokenIndex"
+    )
     public String getUniqueToken() {
         return uniqueToken;
     }
@@ -53,12 +50,14 @@ public class ShortNoteEntity extends BaseEntity {
         this.uniqueToken = uniqueToken;
     }
 
+    // Table PK + GSI partition keys
     @Override
     @DynamoDbPartitionKey
     @DynamoDbSecondaryPartitionKey(
             indexNames = {
-                    "LatestNotesIndex",
-                    "UserUniqueTokenIndex"
+                    "shortnote_createdAt_index",
+                    "UserUniqueTokenIndex",
+                    "CategoryIndex"
             }
     )
     @DynamoDbAttribute("user_id")
@@ -66,20 +65,28 @@ public class ShortNoteEntity extends BaseEntity {
         return super.getUserId();
     }
 
+    // Table SK
     @Override
     @DynamoDbSortKey
+    @DynamoDbAttribute("id")
     public String getId() {
         return super.getId();
     }
 
+    // GSI sort key for latest notes
     @Override
-    @DynamoDbSecondarySortKey(indexNames = "LatestNotesIndex")
+    @DynamoDbSecondarySortKey(
+            indexNames = "shortnote_createdAt_index"
+    )
     @DynamoDbAttribute("createdAt")
     public Instant getCreatedAt() {
         return super.getCreatedAt();
     }
 
     @DynamoDbAttribute("categoryId")
+    @DynamoDbSecondarySortKey(
+            indexNames = "CategoryIndex"
+    )
     public String getCategoryId() {
         return categoryId;
     }
