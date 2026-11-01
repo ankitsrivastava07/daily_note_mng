@@ -9,6 +9,8 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
+import java.util.Collections;
+import java.util.Iterator;
 import java.util.Map;
 
 @Repository
@@ -48,34 +50,49 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
                 .orElse(null);
     }
 
+
     @Override
     public Page<ShortNoteEntity> getAllShortNotes(
             String userId,
             int limit,
             Map<String, AttributeValue> lastEvaluatedKey) {
 
-        // 1. Query on Partition Key (userId)
-        QueryConditional condition = QueryConditional.keyEqualTo(
-                Key.builder().partitionValue(userId).build()
-        );
+        // Query GSI instead of the primary table
+        DynamoDbIndex<ShortNoteEntity> index =
+                table.index("user-createdAt-index");
 
-        QueryEnhancedRequest.Builder builder = QueryEnhancedRequest.builder()
-                .queryConditional(
-                        QueryConditional.keyEqualTo(
-                                Key.builder()
-                                        .partitionValue(userId)
-                                        .build()
+        QueryEnhancedRequest.Builder builder =
+                QueryEnhancedRequest.builder()
+                        .queryConditional(
+                                QueryConditional.keyEqualTo(
+                                        Key.builder()
+                                                .partitionValue(userId)
+                                                .build()
+                                )
                         )
-                )
-                .scanIndexForward(false) // newest createdAt first
-                .limit(limit);
+                        // Latest createdAt first
+                        .scanIndexForward(false)
+                        .limit(limit);
 
-        if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
+        // Continue from the previous page
+        if (lastEvaluatedKey != null &&
+                !lastEvaluatedKey.isEmpty()) {
+
             builder.exclusiveStartKey(lastEvaluatedKey);
         }
 
-        // 3. Execute Query
-        return table.query(builder.build()).iterator().next();
+        // Execute DynamoDB query
+        Iterator<Page<ShortNoteEntity>> iterator =
+                index.query(builder.build()).iterator();
+
+        if (!iterator.hasNext()) {
+            return Page.create(
+                    Collections.emptyList(),
+                    null
+            );
+        }
+
+        return iterator.next();
     }
 
     @Override
