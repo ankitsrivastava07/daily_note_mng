@@ -34,7 +34,7 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         ShortNoteEntity entity = CustomMapper.mapToEntity(createShortNoteDto, ShortNoteEntity.class);
         entity.setId(UUID.randomUUID().toString());
         String token = TokenUtil.generateToken(createShortNoteDto.userId(), createShortNoteDto.title());
-        if ((entity = shortNoteDao.findByHashToken(createShortNoteDto.userId(), token)) != null) {
+        if (shortNoteDao.findByHashToken(createShortNoteDto.userId(), token) != null) {
             logger.info(
                     "Duplicate short note title detected for userId: {} and title: {}",
                     createShortNoteDto.userId(),
