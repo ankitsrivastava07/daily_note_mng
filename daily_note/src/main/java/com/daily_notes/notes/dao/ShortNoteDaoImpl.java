@@ -57,11 +57,10 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
             int limit,
             Map<String, AttributeValue> lastEvaluatedKey) {
 
-        // Query GSI instead of the primary table
         DynamoDbIndex<ShortNoteEntity> index =
                 table.index("shortnote_createdAt_index");
 
-        QueryEnhancedRequest.Builder builder =
+        QueryEnhancedRequest.Builder requestBuilder =
                 QueryEnhancedRequest.builder()
                         .queryConditional(
                                 QueryConditional.keyEqualTo(
@@ -70,20 +69,17 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
                                                 .build()
                                 )
                         )
-                        // Latest createdAt first
                         .scanIndexForward(false)
                         .limit(limit);
 
-        // Continue from the previous page
         if (lastEvaluatedKey != null &&
                 !lastEvaluatedKey.isEmpty()) {
 
-            builder.exclusiveStartKey(lastEvaluatedKey);
+            requestBuilder.exclusiveStartKey(lastEvaluatedKey);
         }
 
-        // Execute DynamoDB query
         Iterator<Page<ShortNoteEntity>> iterator =
-                index.query(builder.build()).iterator();
+                index.query(requestBuilder.build()).iterator();
 
         if (!iterator.hasNext()) {
             return Page.create(

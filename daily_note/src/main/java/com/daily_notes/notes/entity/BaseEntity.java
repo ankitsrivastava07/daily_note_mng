@@ -1,3 +1,4 @@
+
 package com.daily_notes.notes.entity;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
@@ -12,8 +13,12 @@ public abstract class BaseEntity {
     private Instant createdAt;
     private Instant updateAt;
 
+    // Table partition key + GSI partition key
     @DynamoDbPartitionKey
-    @DynamoDbAttribute("userId")
+    @DynamoDbSecondaryPartitionKey(
+            indexNames = "shortnote_createdAt_index"
+    )
+    @DynamoDbAttribute("user_id")
     public String getUserId() {
         return userId;
     }
@@ -22,8 +27,9 @@ public abstract class BaseEntity {
         this.userId = userId;
     }
 
-    @DynamoDbAttribute("id")
+    // Existing table sort key
     @DynamoDbSortKey
+    @DynamoDbAttribute("id")
     public String getId() {
         return id;
     }
@@ -32,6 +38,11 @@ public abstract class BaseEntity {
         this.id = id;
     }
 
+    // GSI sort key
+    @DynamoDbSecondarySortKey(
+            indexNames = "shortnote_createdAt_index"
+    )
+    @DynamoDbAttribute("createdAt")
     public Instant getCreatedAt() {
         return createdAt;
     }
@@ -40,6 +51,7 @@ public abstract class BaseEntity {
         this.createdAt = createdAt;
     }
 
+    @DynamoDbAttribute("updateAt")
     public Instant getUpdateAt() {
         return updateAt;
     }
