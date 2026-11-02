@@ -31,6 +31,11 @@ public class ShortNoteController {
                 HttpStatus.CREATED);
     }
 
+    @GetMapping
+    public ResponseEntity<?> getShortNoteById(@RequestHeader String userId, @RequestParam String shortNoteId) {
+        return new ResponseEntity<>(shortNoteService.getShortNoteById(userId, shortNoteId), HttpStatus.OK);
+    }
+
     @GetMapping(produces = "application/json")
     public ResponseEntity<?> getAllShortNotes(
             HttpServletRequest request,
@@ -89,16 +94,6 @@ public class ShortNoteController {
         }
 
         return ResponseEntity.ok(Map.of("data", result));
-    }
-
-    // Helper method for case-insensitive header checking
-    private String getHeaderIgnoreCase(HttpHeaders headers, String targetKey) {
-        for (Map.Entry<String, java.util.List<String>> entry : headers.entrySet()) {
-            if (entry.getKey().equalsIgnoreCase(targetKey) && entry.getValue() != null && !entry.getValue().isEmpty()) {
-                return entry.getValue().get(0);
-            }
-        }
-        return null;
     }
 
     @DeleteMapping

@@ -7,6 +7,7 @@ import com.daily_notes.notes.exceptions.exception.ShortEntityAlreadyExistExcepti
 import com.daily_notes.notes.mapper.CustomMapper;
 import com.daily_notes.notes.records.ApiResponse;
 import com.daily_notes.notes.utility.constant.TokenUtil;
+import org.apache.kafka.shaded.com.google.protobuf.Api;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,8 +15,6 @@ import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Instant;
-import java.util.Locale;
-import java.util.Objects;
 import java.util.UUID;
 import java.util.Map;
 
@@ -43,7 +42,6 @@ public class ShortNoteServiceImpl implements ShortNoteService {
                 );
 
         entity.setId(UUID.randomUUID().toString());
-
         // Always generate creation timestamp on backend
         Instant createdAt = Instant.now();
         entity.setCreatedAt(createdAt);
@@ -56,7 +54,6 @@ public class ShortNoteServiceImpl implements ShortNoteService {
 
         if (shortNoteDao.findByHashToken(
                 createShortNoteDto.userId(), token) != null) {
-
             throw new ShortEntityAlreadyExistException(
                     "You already have a short note with this title. " +
                             "Please choose a different title."
@@ -81,12 +78,20 @@ public class ShortNoteServiceImpl implements ShortNoteService {
     }
 
     @Override
+    public ApiResponse getShortNoteById(String userId, String shortNoteId) {
+        ApiResponse apiResponse = new ApiResponse();
+        apiResponse.success(Boolean.TRUE);
+        apiResponse.message("Success");
+        apiResponse.data(shortNoteDao.getShortNoteById(userId, shortNoteId));
+        return apiResponse;
+    }
+
+    @Override
     public Page<ShortNoteEntity> getAllShortNotes(String categoryId1, String userId, Integer limit, Map<String, AttributeValue> attributeValueMap) {
         logger.info("Fetching all short notes for userId: {}, " +
                 "categoryId: {}, limit: {}, " +
                 "attributeValueMap: {}", userId, categoryId1, limit, attributeValueMap);
         return shortNoteDao.getAllShortNotes(userId, limit, attributeValueMap);
-
     }
 
     @Override

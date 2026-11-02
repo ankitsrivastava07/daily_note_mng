@@ -36,25 +36,22 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
         return index.query(r -> r.queryConditional(condition)).stream().flatMap(page -> page.items().stream()).findFirst().orElse(null);
     }
 
+    @Override
+    public ShortNoteEntity getShortNoteById(String userId, String shortNoteId) {
+        return table.getItem(Key.builder().partitionValue(userId).sortValue(shortNoteId).build());
+    }
 
     @Override
     public Page<ShortNoteEntity> getAllShortNotes(String userId, int limit, Map<String, AttributeValue> lastEvaluatedKey) {
-
         DynamoDbIndex<ShortNoteEntity> index = table.index("shortnote_createdAt_index");
-
         QueryEnhancedRequest.Builder requestBuilder = QueryEnhancedRequest.builder().queryConditional(QueryConditional.keyEqualTo(Key.builder().partitionValue(userId).build())).scanIndexForward(false).limit(limit);
-
         if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
-
             requestBuilder.exclusiveStartKey(lastEvaluatedKey);
         }
-
         Iterator<Page<ShortNoteEntity>> iterator = index.query(requestBuilder.build()).iterator();
-
         if (!iterator.hasNext()) {
             return Page.create(Collections.emptyList(), null);
         }
-
         return iterator.next();
     }
 

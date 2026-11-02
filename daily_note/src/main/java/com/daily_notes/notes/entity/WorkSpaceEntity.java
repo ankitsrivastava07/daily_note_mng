@@ -3,6 +3,8 @@ package com.daily_notes.notes.entity;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
+import java.time.Instant;
+
 @DynamoDbBean
 public class WorkSpaceEntity {
 
@@ -12,6 +14,15 @@ public class WorkSpaceEntity {
     private String createdBy;
     private String accessType;
     private String tokenKey;
+    private Instant createdAt;
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
 
     @DynamoDbPartitionKey
     @DynamoDbAttribute("user_id")

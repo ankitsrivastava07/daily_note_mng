@@ -20,4 +20,6 @@ public interface ShortNoteDao {
             Map<String, AttributeValue> lastEvaluatedKey);
 
     void deleteShortNoteById(String userId, String noteId, String id);
+
+    ShortNoteEntity getShortNoteById(String userId, String shortNoteId);
 }
