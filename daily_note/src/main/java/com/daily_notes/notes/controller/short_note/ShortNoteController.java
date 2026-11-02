@@ -31,8 +31,8 @@ public class ShortNoteController {
                 HttpStatus.CREATED);
     }
 
-    @GetMapping
-    public ResponseEntity<?> getShortNoteById(@RequestHeader String userId, @RequestParam String shortNoteId) {
+    @GetMapping("/{shortNoteId}")
+    public ResponseEntity<?> getShortNoteById(@RequestHeader String userId, @PathVariable String shortNoteId) {
         return new ResponseEntity<>(shortNoteService.getShortNoteById(userId, shortNoteId), HttpStatus.OK);
     }
 
