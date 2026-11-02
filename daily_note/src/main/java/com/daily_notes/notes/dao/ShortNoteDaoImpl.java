@@ -19,10 +19,7 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
     private final DynamoDbTable<ShortNoteEntity> table;
 
     public ShortNoteDaoImpl(DynamoDbEnhancedClient enhancedClient) {
-        this.table = enhancedClient.table(
-                "short_note",
-                TableSchema.fromBean(ShortNoteEntity.class)
-        );
+        this.table = enhancedClient.table("short_note", TableSchema.fromBean(ShortNoteEntity.class));
     }
 
     @Override
@@ -32,59 +29,30 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
 
     @Override
     public ShortNoteEntity findByHashToken(String userId, String uniqueToken) {
-        DynamoDbIndex<ShortNoteEntity> index =
-                table.index("UserUniqueTokenIndex");
+        DynamoDbIndex<ShortNoteEntity> index = table.index("UserUniqueTokenIndex");
 
-        QueryConditional condition = QueryConditional.keyEqualTo(
-                Key.builder()
-                        .partitionValue(userId)
-                        .sortValue(uniqueToken)
-                        .build()
-        );
+        QueryConditional condition = QueryConditional.keyEqualTo(Key.builder().partitionValue(userId).sortValue(uniqueToken).build());
 
-        return index.query(r -> r.queryConditional(condition))
-                .stream()
-                .flatMap(page -> page.items().stream())
-                .findFirst()
-                .orElse(null);
+        return index.query(r -> r.queryConditional(condition)).stream().flatMap(page -> page.items().stream()).findFirst().orElse(null);
     }
 
 
     @Override
-    public Page<ShortNoteEntity> getAllShortNotes(
-            String userId,
-            int limit,
-            Map<String, AttributeValue> lastEvaluatedKey) {
+    public Page<ShortNoteEntity> getAllShortNotes(String userId, int limit, Map<String, AttributeValue> lastEvaluatedKey) {
 
-        DynamoDbIndex<ShortNoteEntity> index =
-                table.index("shortnote_createdAt_index");
+        DynamoDbIndex<ShortNoteEntity> index = table.index("shortnote_createdAt_index");
 
-        QueryEnhancedRequest.Builder requestBuilder =
-                QueryEnhancedRequest.builder()
-                        .queryConditional(
-                                QueryConditional.keyEqualTo(
-                                        Key.builder()
-                                                .partitionValue(userId)
-                                                .build()
-                                )
-                        )
-                        .scanIndexForward(false)
-                        .limit(limit);
+        QueryEnhancedRequest.Builder requestBuilder = QueryEnhancedRequest.builder().queryConditional(QueryConditional.keyEqualTo(Key.builder().partitionValue(userId).build())).scanIndexForward(false).limit(limit);
 
-        if (lastEvaluatedKey != null &&
-                !lastEvaluatedKey.isEmpty()) {
+        if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
 
             requestBuilder.exclusiveStartKey(lastEvaluatedKey);
         }
 
-        Iterator<Page<ShortNoteEntity>> iterator =
-                index.query(requestBuilder.build()).iterator();
+        Iterator<Page<ShortNoteEntity>> iterator = index.query(requestBuilder.build()).iterator();
 
         if (!iterator.hasNext()) {
-            return Page.create(
-                    Collections.emptyList(),
-                    null
-            );
+            return Page.create(Collections.emptyList(), null);
         }
 
         return iterator.next();

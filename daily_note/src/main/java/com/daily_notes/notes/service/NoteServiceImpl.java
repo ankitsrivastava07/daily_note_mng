@@ -17,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
@@ -57,6 +58,7 @@ public class NoteServiceImpl implements NoteService {
         NoteEntity noteEntity = CustomMapper.mapToEntity(createNoteDto, NoteEntity.class);
         noteEntity.setTitle(title);
         noteEntity.setNoteKey(token);
+        noteEntity.setCreateAt(Instant.now());
 
         logger.info("Note with title: {} does not exist for userId: {}", title, userId);
         noteEntity = noteDaoService.createNote(noteEntity);
@@ -82,6 +84,7 @@ public class NoteServiceImpl implements NoteService {
             throw new NoSuchElementException("Note not found with id: " +
                     updateNoteDto.id() + " and userId: " + updateNoteDto.userId());
         }
+        note.setUpdatedAt(Instant.now());
         note = noteDaoService.updateNote(note);
         return new ApiResponse(SUCCESS, true, Arrays.asList(note), new ArrayList<>());
     }
