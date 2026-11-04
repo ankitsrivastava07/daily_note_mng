@@ -15,7 +15,6 @@ import java.util.Map;
 
 @Repository
 public class ShortNoteDaoImpl implements ShortNoteDao {
-
     private final DynamoDbTable<ShortNoteEntity> table;
 
     public ShortNoteDaoImpl(DynamoDbEnhancedClient enhancedClient) {
@@ -30,15 +29,17 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
     @Override
     public ShortNoteEntity findByHashToken(String userId, String uniqueToken) {
         DynamoDbIndex<ShortNoteEntity> index = table.index("UserUniqueTokenIndex");
-
         QueryConditional condition = QueryConditional.keyEqualTo(Key.builder().partitionValue(userId).sortValue(uniqueToken).build());
-
-        return index.query(r -> r.queryConditional(condition)).stream().flatMap(page -> page.items().stream()).findFirst().orElse(null);
+        return index.query(r -> r.queryConditional(condition)).stream().flatMap(page ->
+                        page.items().stream())
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
     public ShortNoteEntity getShortNoteById(String userId, String shortNoteId) {
-        return table.getItem(Key.builder().partitionValue(userId).sortValue(shortNoteId).build());
+        ShortNoteEntity entity = table.getItem(Key.builder().partitionValue(userId).sortValue(shortNoteId).build());
+        return entity;
     }
 
     @Override

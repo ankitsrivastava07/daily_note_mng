@@ -38,24 +38,10 @@ public class ShortNoteController {
 
     @GetMapping(produces = "application/json")
     public ResponseEntity<?> getAllShortNotes(
-            HttpServletRequest request,
+            @RequestHeader String userId,
             @RequestParam(defaultValue = "10") Integer limit,
             @RequestParam(required = false) String lastKey) {
 
-        // Check all common casing variants sent by browsers or gateways
-        String userid = request.getHeader("userId");
-        if (userid == null) userid = request.getHeader("userid");
-        if (userid == null) userid = request.getHeader("Userid");
-
-        if (userid == null || userid.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("message", "Required header 'userid' is missing", "success", false));
-        }
-
-        String categoryid = request.getHeader("categoryId");
-        if (categoryid == null) categoryid = request.getHeader("categoryid");
-        if (categoryid == null) categoryid = request.getHeader("Categoryid");
-
-        // FIXED: Decode as Map<String, String> instead of Map<String, AttributeValue>
         Map<String, AttributeValue> decodedKey = null;
         if (lastKey != null && !lastKey.isEmpty()) {
             try {
@@ -70,17 +56,10 @@ public class ShortNoteController {
             }
         }
 
-        var page = shortNoteService.getAllShortNotes(
-                categoryid != null ? categoryid : "hgfhgf",
-                userid,
-                limit,
-                decodedKey
-        );
+        var page = shortNoteService.getAllShortNotes(userId, limit, decodedKey);
 
         Map<String, Object> result = new HashMap<>();
         result.put("items", page.items());
-
-        // FIXED: Convert page.lastEvaluatedKey() to a safe Map<String, String> for Jackson serialization
         if (page.lastEvaluatedKey() != null && !page.lastEvaluatedKey().isEmpty()) {
             Map<String, String> serializableKey = new HashMap<>();
             for (Map.Entry<String, AttributeValue> entry : page.lastEvaluatedKey().entrySet()) {

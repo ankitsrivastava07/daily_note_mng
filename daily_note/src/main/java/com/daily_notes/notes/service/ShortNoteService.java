@@ -13,7 +13,7 @@ public interface ShortNoteService {
 
     ApiResponse createShortNote(CreateShortNoteDto createShortNoteDto) throws Exception;
 
-    Page<ShortNoteEntity> getAllShortNotes(String categoryId, String userId, Integer limit, Map<String, AttributeValue> attributeValueMap);
+    Page<ShortNoteEntity> getAllShortNotes(String userId, Integer limit, Map<String, AttributeValue> attributeValueMap);
 
     ApiResponse deleteShortNoteById(String category, String userId, String noteId);
 

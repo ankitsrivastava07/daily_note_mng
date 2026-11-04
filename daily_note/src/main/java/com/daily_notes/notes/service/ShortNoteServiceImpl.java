@@ -79,18 +79,28 @@ public class ShortNoteServiceImpl implements ShortNoteService {
 
     @Override
     public ApiResponse getShortNoteById(String userId, String shortNoteId) {
-        ApiResponse apiResponse = new ApiResponse();
-        apiResponse.success(Boolean.TRUE);
-        apiResponse.message("Success");
-        apiResponse.data(shortNoteDao.getShortNoteById(userId, shortNoteId));
-        return apiResponse;
+
+        ShortNoteEntity shortNote =
+                shortNoteDao.getShortNoteById(userId, shortNoteId);
+
+        if (shortNote == null) {
+            return new ApiResponse()
+                    .success(Boolean.FALSE)
+                    .message("Short note not found")
+                    .error("No record found for ID: " + shortNoteId);
+        }
+
+        return new ApiResponse()
+                .success(Boolean.TRUE)
+                .message("Short note fetched successfully")
+                .data(shortNote);
     }
 
     @Override
-    public Page<ShortNoteEntity> getAllShortNotes(String categoryId1, String userId, Integer limit, Map<String, AttributeValue> attributeValueMap) {
+    public Page<ShortNoteEntity> getAllShortNotes(String userId, Integer limit, Map<String, AttributeValue> attributeValueMap) {
         logger.info("Fetching all short notes for userId: {}, " +
-                "categoryId: {}, limit: {}, " +
-                "attributeValueMap: {}", userId, categoryId1, limit, attributeValueMap);
+                "limit: {}, " +
+                "attributeValueMap: {}", userId, limit, attributeValueMap);
         return shortNoteDao.getAllShortNotes(userId, limit, attributeValueMap);
     }
 
