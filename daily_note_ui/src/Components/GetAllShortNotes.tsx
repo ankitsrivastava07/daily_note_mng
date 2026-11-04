@@ -57,7 +57,9 @@ function GetAllShortNotes() {
             });
 
             if (!response.ok) {
-                throw new Error(`Unable to load notes (HTTP ${response.status}).`);
+                const httpError = new Error("Unable to load your notes.") as Error & { status?: number };
+                httpError.status = response.status;
+                throw httpError;
             }
 
             const responseData: ListResponse = await response.json();
@@ -77,7 +79,23 @@ function GetAllShortNotes() {
             setHasMore(Boolean(nextKey));
         } catch (err) {
             console.error("Fetch short notes error:", err);
-            setError(err instanceof Error ? err.message : "Something went wrong while loading notes.");
+
+            const status = (err as (Error & { status?: number }) | null)?.status;
+
+            if (status === 502 || status === 503 || status === 504) {
+                setError(
+                    "We couldn't connect to the notes service right now. " +
+                    "Please wait a moment and try again."
+                );
+            } else if (status === 401 || status === 403) {
+                setError("Your session may have expired. Please sign in again.");
+            } else if (status == null) {
+                setError(
+                    "We couldn't reach the notes service. Check your internet connection and try again."
+                );
+            } else {
+                setError("We couldn't load your notes. Please try again.");
+            }
         } finally {
             setLoading(false);
         }
@@ -185,7 +203,11 @@ function GetAllShortNotes() {
     };
 
     const handleRetry = () => {
-        if (!loading) void fetchShortNotes();
+        if (loading) return;
+        setShortNotes([]);
+        setLastEvaluatedKey(null);
+        setHasMore(true);
+        void fetchShortNotes();
     };
 
     return (
@@ -269,12 +291,25 @@ function GetAllShortNotes() {
                 </div>
 
                 {error && (
-                    <div className="sn-error" role="alert">
-                        <div>
-                            <strong>Something went wrong</strong>
-                            <span>{error}</span>
+                    <div className="sn-error-card" role="alert">
+                        <div className="sn-error-icon" aria-hidden="true">!</div>
+
+                        <div className="sn-error-content">
+                            <h3>We're having trouble loading your notes</h3>
+                            <p>{error}</p>
+                            <span className="sn-error-hint">
+                                This connection error does not mean your notes were deleted.
+                            </span>
                         </div>
-                        <button onClick={handleRetry} disabled={loading}>Try again</button>
+
+                        <button
+                            className="sn-error-retry"
+                            onClick={handleRetry}
+                            disabled={loading}
+                        >
+                            <span aria-hidden="true">↻</span>
+                            {loading ? "Retrying..." : "Try again"}
+                        </button>
                     </div>
                 )}
 
