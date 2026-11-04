@@ -83,13 +83,13 @@ function GetAllShortNotes() {
                 if (!response.ok) {
                     throw new Error(
                         response.status === 502 ||
-                        response.status === 503 ||
-                        response.status === 504
+                            response.status === 503 ||
+                            response.status === 504
                             ? "The notes service is temporarily unavailable. Please try again."
                             : response.status === 401 ||
-                              response.status === 403
-                            ? "Your session may have expired. Please sign in again."
-                            : "Unable to load your notes. Please try again."
+                                response.status === 403
+                                ? "Your session may have expired. Please sign in again."
+                                : "Unable to load your notes. Please try again."
                     );
                 }
 
@@ -167,7 +167,7 @@ function GetAllShortNotes() {
                 const matchesCategory =
                     selectedCategory === "ALL" ||
                     (note.category || "").toLowerCase() ===
-                        selectedCategory.toLowerCase();
+                    selectedCategory.toLowerCase();
 
                 return matchesSearch && matchesCategory;
             })
@@ -240,8 +240,8 @@ function GetAllShortNotes() {
             if (!response.ok) {
                 throw new Error(
                     response.status === 502 ||
-                    response.status === 503 ||
-                    response.status === 504
+                        response.status === 503 ||
+                        response.status === 504
                         ? "The notes service is temporarily unavailable. Please try again."
                         : "Unable to delete this note. Please try again."
                 );
@@ -257,7 +257,7 @@ function GetAllShortNotes() {
                 if (responseData.success === false) {
                     throw new Error(
                         responseData.message ||
-                            "Unable to delete this note."
+                        "Unable to delete this note."
                     );
                 }
             }
@@ -460,7 +460,7 @@ function GetAllShortNotes() {
                                 onChange={event =>
                                     setSortOrder(
                                         event.target.value as
-                                            "newest" | "oldest"
+                                        "newest" | "oldest"
                                     )
                                 }
                             >
@@ -477,19 +477,32 @@ function GetAllShortNotes() {
                 </div>
 
                 {/* Load Error */}
+
+                {/* Load Error */}
                 {error && (
-                    <div className="sn-error" role="alert">
-                        <div>
-                            <strong>Something went wrong</strong>
-                            <span>{error}</span>
+                    <div className="sn-error-card" role="alert">
+                        <div className="sn-error-icon" aria-hidden="true">
+                            !
+                        </div>
+
+                        <div className="sn-error-content">
+                            <h3>Unable to load your notes</h3>
+
+                            <p>{error}</p>
+
+                            <span className="sn-error-hint">
+                                Your notes are safe. Please try again in a moment.
+                            </span>
                         </div>
 
                         <button
                             type="button"
+                            className="sn-error-retry"
                             onClick={handleRetry}
                             disabled={loading}
                         >
-                            Try again
+                            <span aria-hidden="true">↻</span>
+                            {loading ? "Retrying..." : "Try again"}
                         </button>
                     </div>
                 )}
@@ -609,10 +622,9 @@ function GetAllShortNotes() {
                                                         onClick={() =>
                                                             handleOpen(note.id)
                                                         }
-                                                        aria-label={`Open ${
-                                                            note.title ||
+                                                        aria-label={`Open ${note.title ||
                                                             "note"
-                                                        }`}
+                                                            }`}
                                                     >
                                                         Open{" "}
                                                         <span aria-hidden="true">
@@ -631,10 +643,9 @@ function GetAllShortNotes() {
                                                         disabled={
                                                             deletingId !== null
                                                         }
-                                                        aria-label={`Delete ${
-                                                            note.title ||
+                                                        aria-label={`Delete ${note.title ||
                                                             "note"
-                                                        }`}
+                                                            }`}
                                                     >
                                                         {deletingId === note.id
                                                             ? "Deleting…"

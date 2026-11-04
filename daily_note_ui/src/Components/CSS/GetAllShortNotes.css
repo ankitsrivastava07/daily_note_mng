@@ -987,3 +987,111 @@
     font-size: 12px;
     line-height: 1.5;
 }
+
+
+
+
+
+/* ==========================================
+   SHORT NOTES - API ERROR CARD
+========================================== */
+
+.sn-error-card {
+    display: flex;
+    align-items: center;
+    gap: 17px;
+    margin: 20px 25px;
+    padding: 22px 24px;
+    border: 1px solid #f3d5d8;
+    border-radius: 12px;
+    background: linear-gradient(120deg, #fff7f7, #ffffff);
+    box-shadow: 0 4px 15px rgba(180, 35, 53, 0.05);
+}
+
+.sn-error-icon {
+    display: flex;
+    width: 46px;
+    height: 46px;
+    flex: 0 0 46px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: #feecec;
+    color: #d92d3f;
+    font-size: 25px;
+    font-weight: 800;
+}
+
+.sn-error-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.sn-error-content h3 {
+    margin: 0 0 6px;
+    color: #26334a;
+    font-size: 15px;
+    font-weight: 750;
+}
+
+.sn-error-content p {
+    margin: 0 0 7px;
+    color: #667085;
+    font-size: 13px;
+    line-height: 1.6;
+}
+
+.sn-error-hint {
+    display: block;
+    color: #929bad;
+    font-size: 11px;
+}
+
+.sn-error-retry {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 39px;
+    padding: 0 17px;
+    border: 1px solid #3157d5;
+    border-radius: 8px;
+    background: #3157d5;
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    white-space: nowrap;
+    transition: all .2s ease;
+}
+
+.sn-error-retry:hover:not(:disabled) {
+    background: #2446b8;
+    border-color: #2446b8;
+    box-shadow: 0 4px 10px rgba(49, 87, 213, .18);
+}
+
+.sn-error-retry:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+    .sn-error-card {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 13px;
+        margin: 14px;
+        padding: 16px;
+    }
+
+    .sn-error-content {
+        flex: 1;
+        min-width: 180px;
+    }
+
+    .sn-error-retry {
+        margin-left: 59px;
+    }
+}
