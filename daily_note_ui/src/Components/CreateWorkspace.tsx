@@ -1,5 +1,5 @@
-
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 // ==========================================
 // 1. CREATE WORKSPACE COMPONENT
@@ -52,7 +52,6 @@ function CreateWorkspace({ onWorkspaceCreated }) {
                 }
             );
 
-            // Read the response body only once.
             const result = await response.json();
 
             if (!response.ok) {
@@ -66,14 +65,12 @@ function CreateWorkspace({ onWorkspaceCreated }) {
                 );
             }
 
-            // Success: show only the success message.
             setError('');
             setMessage(result.message || 'Workspace created successfully!');
 
             setName('');
             setAccessType('PRIVATE');
 
-            // Refresh the workspace list after successful creation.
             if (onWorkspaceCreated) {
                 onWorkspaceCreated();
             }
@@ -179,6 +176,7 @@ function WorkspaceList({ refreshTrigger, onSelectWorkspace }) {
     const [workspaces, setWorkspaces] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const navigate = useNavigate();
 
     const userId = localStorage.getItem('userId') || 'ankit0397';
     const API_BASE_URL =
@@ -287,7 +285,12 @@ function WorkspaceList({ refreshTrigger, onSelectWorkspace }) {
                                 <button
                                     type="button"
                                     className="btn btn-outline-primary btn-sm mt-auto"
-                                    onClick={() => onSelectWorkspace?.(ws)}
+                                    onClick={() => {
+                                        if (onSelectWorkspace) {
+                                            onSelectWorkspace(ws);
+                                        }
+                                        navigate(`/workspace/${ws.id}`);
+                                    }}
                                 >
                                     Open Workspace
                                 </button>
@@ -312,7 +315,6 @@ export default function WorkspaceDashboard() {
 
     const handleSelectWorkspace = (workspace) => {
         console.log('Selected Workspace:', workspace);
-        // Add navigation logic here.
     };
 
     return (
@@ -322,7 +324,6 @@ export default function WorkspaceDashboard() {
             <CreateWorkspace
                 onWorkspaceCreated={handleWorkspaceCreated}
             />
-
             <hr className="my-4" />
 
             <WorkspaceList
