@@ -1,10 +1,14 @@
+
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import "./CSS/ShortNoteComponent.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const PAGE_SIZE = 10;
 
 function GetAllShortNotes() {
+    const navigate = useNavigate();
+
     const [shortNotes, setShortNotes] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -12,7 +16,6 @@ function GetAllShortNotes() {
     const [hasNextPage, setHasNextPage] = useState(false);
 
     const requestInProgress = useRef(false);
-    const mountedRef = useRef(false);
 
     const getAllShortNotes = useCallback(async (paginationKey = null) => {
         if (requestInProgress.current) return;
@@ -32,14 +35,17 @@ function GetAllShortNotes() {
             url.searchParams.set("limit", String(PAGE_SIZE));
 
             if (paginationKey) {
-                url.searchParams.set("lastKey", paginationKey);
+                const cursor = typeof paginationKey === "string"
+                    ? paginationKey
+                    : JSON.stringify(paginationKey);
+
+                url.searchParams.set("lastKey", cursor);
             }
 
             const response = await fetch(url.toString(), {
                 method: "GET",
                 headers: {
                     userid: userId,
-                    categoryId: "hgfhgf",
                     Accept: "application/json",
                 },
             });
@@ -52,11 +58,16 @@ function GetAllShortNotes() {
             }
 
             const responseData = await response.json();
+
+            if (responseData?.success === false) {
+                throw new Error(responseData.message || "Unable to fetch notes.");
+            }
+
             const result = responseData?.data;
 
             if (!result || !Array.isArray(result.items)) {
                 throw new Error(
-                    "Unexpected API response. Expected data.items to be an array."
+                    "Unexpected API response. Expected data.items."
                 );
             }
 
@@ -64,9 +75,7 @@ function GetAllShortNotes() {
             const nextKey = result.lastEvaluatedKey || null;
 
             setShortNotes((previousNotes) => {
-                if (!paginationKey) {
-                    return notes;
-                }
+                if (!paginationKey) return notes;
 
                 const existingIds = new Set(
                     previousNotes.map((note) => note.id)
@@ -80,6 +89,7 @@ function GetAllShortNotes() {
 
             setLastEvaluatedKey(nextKey);
             setHasNextPage(Boolean(nextKey));
+
         } catch (err) {
             setError(err.message || "Unable to load short notes.");
         } finally {
@@ -89,14 +99,23 @@ function GetAllShortNotes() {
     }, []);
 
     useEffect(() => {
-        mountedRef.current = true;
-
         getAllShortNotes();
-
-        return () => {
-            mountedRef.current = false;
-        };
     }, [getAllShortNotes]);
+
+    // Navigate to note details
+    const handleRowClick = (noteId) => {
+        if (noteId) {
+            navigate(`/short-note/${noteId}`);
+        }
+    };
+
+    // Keyboard accessibility
+    const handleRowKeyDown = (event, noteId) => {
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleRowClick(noteId);
+        }
+    };
 
     const handleLoadMore = () => {
         if (!loading && hasNextPage && lastEvaluatedKey) {
@@ -116,11 +135,12 @@ function GetAllShortNotes() {
 
     return (
         <main className="short-note-container">
+
             <header className="short-note-header">
                 <div>
                     <h2>Short Notes</h2>
+                    <p>Total notes loaded: {shortNotes.length}</p>
                 </div>
-
             </header>
 
             {error && (
@@ -143,13 +163,23 @@ function GetAllShortNotes() {
                             <th>Name</th>
                             <th>Content</th>
                             <th>Category</th>
-                            <th>Actions</th>
+                            <th>Action</th>
                         </tr>
                     </thead>
 
                     <tbody>
                         {shortNotes.map((note, index) => (
-                            <tr key={note.id || `${note.title}-${index}`}>
+                            <tr
+                                key={note.id || `${note.title}-${index}`}
+                                className="short-note-clickable-row"
+                                onClick={() => handleRowClick(note.id)}
+                                onKeyDown={(event) =>
+                                    handleRowKeyDown(event, note.id)
+                                }
+                                tabIndex={0}
+                                role="link"
+                                aria-label={`Open ${note.title || "Untitled note"}`}
+                            >
                                 <td className="note-name">
                                     {note.title || note.name || "Untitled"}
                                 </td>
@@ -165,13 +195,9 @@ function GetAllShortNotes() {
                                 </td>
 
                                 <td className="short-note-actions">
-                                    <a href={`/short-note/${note.id}`}>
-                                        Open
-                                    </a>
-                                    <span aria-hidden="true"> | </span>
-                                    <a href={`/short-note/${note.id}/edit`}>
-                                        Edit
-                                    </a>
+                                    <span className="short-note-open-link">
+                                        Open →
+                                    </span>
                                 </td>
                             </tr>
                         ))}
@@ -197,7 +223,9 @@ function GetAllShortNotes() {
             </section>
 
             {loading && shortNotes.length > 0 && (
-                <p className="short-note-loading">Loading more notes...</p>
+                <p className="short-note-loading">
+                    Loading more notes...
+                </p>
             )}
 
             <footer className="short-note-pagination">
