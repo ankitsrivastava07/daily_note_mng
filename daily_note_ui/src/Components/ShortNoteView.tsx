@@ -306,14 +306,6 @@ function ShortNoteView() {
         </section>
 
       </article>
-
-      {/* Bottom navigation */}
-      <footer className="short-note-view-bottom">
-        <Link to="/get-all-short-notes">
-          ← Return to all notes
-        </Link>
-      </footer>
-
     </main>
   );
 }
