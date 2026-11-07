@@ -1,3 +1,8 @@
+
+/* =====================================
+   SHORT NOTES TABLE
+===================================== */
+
 .short-note-container {
     width: 95%;
     margin: 30px auto;
@@ -10,20 +15,25 @@
 
 .table-wrapper {
     width: 100%;
-    overflow-x: auto;
+    max-height: 500px;
+    overflow: auto;
     border: 1px solid #e5e5e5;
     border-radius: 10px;
 }
 
 .short-note-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
 }
 
-.short-note-table th {
+.short-note-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 16px 20px;
     background: #f5f5f5;
     text-align: left;
-    padding: 16px 20px;
     color: #666;
     font-weight: 600;
 }
@@ -35,14 +45,15 @@
 }
 
 .note-name {
-    font-weight: 600;
+    min-width: 180px;
     width: 20%;
+    font-weight: 600;
 }
 
 .note-content {
-    width: 50%;
+    min-width: 300px;
     max-width: 500px;
-
+    width: 50%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -53,63 +64,8 @@
     margin-right: 5px;
 }
 
-.short-note-table tbody tr:hover {
-    background: #fafafa;
-}
-
 .error {
     color: red;
-}
-
-
-.table-wrapper {
-    width: 100%;
-
-    /* table height */
-    max-height: 500px;
-
-    /* vertical + horizontal scroll */
-    overflow-y: auto;
-    overflow-x: auto;
-
-    border: 1px solid #e5e5e5;
-    border-radius: 10px;
-}
-
-.short-note-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-}
-
-/* Keep header visible while scrolling */
-.short-note-table thead th {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-
-    background: #f5f5f5;
-    padding: 16px 20px;
-    text-align: left;
-}
-
-.short-note-table td {
-    padding: 16px 20px;
-    border-top: 1px solid #e8e8e8;
-}
-
-.note-name {
-    min-width: 180px;
-    font-weight: 600;
-}
-
-.note-content {
-    min-width: 500px;
-    max-width: 500px;
-
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 
@@ -140,10 +96,6 @@
     font-size: 14px;
 }
 
-.short-note-back-button:hover {
-    color: #2563eb;
-}
-
 .short-note-edit-button {
     display: inline-block;
     padding: 10px 18px;
@@ -153,10 +105,6 @@
     text-decoration: none;
     font-size: 14px;
     font-weight: 600;
-}
-
-.short-note-edit-button:hover {
-    background: #1d4ed8;
 }
 
 .short-note-detail-card {
@@ -243,10 +191,6 @@
     overflow-wrap: anywhere;
 }
 
-.short-note-link:hover {
-    text-decoration: underline;
-}
-
 .short-note-no-content {
     color: #94a3b8;
     font-style: italic;
@@ -295,7 +239,10 @@
     font-size: 14px;
 }
 
-/* Loading and error states */
+
+/* =====================================
+   LOADING AND ERROR STATES
+===================================== */
 
 .short-note-state {
     text-align: center;
@@ -318,9 +265,17 @@
     border-color: #fecaca;
 }
 
-/* Responsive */
+
+/* =====================================
+   RESPONSIVE DESIGN
+===================================== */
 
 @media (max-width: 768px) {
+
+    .short-note-container {
+        width: 96%;
+    }
+
     .short-note-view-container {
         padding: 0 14px;
         margin: 20px auto;
@@ -344,11 +299,68 @@
 }
 
 @media (max-width: 480px) {
+
     .short-note-view-topbar {
         flex-direction: column;
     }
 
     .short-note-edit-button {
         width: fit-content;
+    }
+
+    .short-note-detail-card {
+        padding: 16px;
+    }
+
+    .short-note-table th,
+    .short-note-table td {
+        padding: 12px;
+    }
+}
+
+
+
+
+/* =====================================
+   DISABLE MOUSE HOVER EFFECTS
+   SHORT NOTE PAGES ONLY
+===================================== */
+
+@media (hover: hover) {
+
+    .short-note-container *,
+    .short-note-view-container * {
+        transition: none !important;
+        animation: none !important;
+    }
+
+    .short-note-table tbody tr:hover {
+        background: inherit !important;
+    }
+
+    .short-note-table a:hover {
+        color: inherit !important;
+        background: transparent !important;
+        text-decoration: none !important;
+    }
+
+    .short-note-back-button:hover {
+        color: #475569 !important;
+        text-decoration: none !important;
+    }
+
+    .short-note-edit-button:hover {
+        background: #2563eb !important;
+        color: white !important;
+    }
+
+    .short-note-link:hover {
+        color: #2563eb !important;
+        text-decoration: none !important;
+    }
+
+    .short-note-view-bottom a:hover {
+        color: #2563eb !important;
+        text-decoration: none !important;
     }
 }
