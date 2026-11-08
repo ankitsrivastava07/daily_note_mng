@@ -15,7 +15,7 @@ public interface ShortNoteService {
 
     Page<ShortNoteEntity> getAllShortNotes(String userId, Integer limit, Map<String, AttributeValue> attributeValueMap);
 
-    ApiResponse deleteShortNoteById(String category, String userId, String noteId);
+    ApiResponse deleteShortNoteById(String userId, String noteId);
 
     ApiResponse getShortNoteById(String userId, String shortNoteId);
 }

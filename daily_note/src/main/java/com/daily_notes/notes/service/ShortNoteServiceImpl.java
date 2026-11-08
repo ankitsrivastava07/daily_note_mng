@@ -70,10 +70,11 @@ public class ShortNoteServiceImpl implements ShortNoteService {
                 entity.getCreatedAt()
         );
 
-        shortNoteDao.createShortNote(entity);
+        entity = shortNoteDao.createShortNote(entity);
 
         return new ApiResponse()
                 .success(Boolean.TRUE)
+                .data(entity)
                 .message("Success");
     }
 
@@ -105,9 +106,9 @@ public class ShortNoteServiceImpl implements ShortNoteService {
     }
 
     @Override
-    public ApiResponse deleteShortNoteById(String category, String userId, String noteId) {
-        logger.info("Deleting short note with noteId: {}, userId: {}, category: {}", noteId, userId, category);
-        shortNoteDao.deleteShortNoteById(category, userId, noteId);
-        return new ApiResponse().success(true);
+    public ApiResponse deleteShortNoteById(String userId, String noteId) {
+        logger.info("Deleting short note with noteId: {}, userId: {}", noteId, userId);
+        shortNoteDao.deleteShortNoteById(userId, noteId);
+        return new ApiResponse().success(Boolean.TRUE).message("Short note deleted successfully");
     }
 }

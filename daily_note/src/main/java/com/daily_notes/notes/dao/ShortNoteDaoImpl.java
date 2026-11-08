@@ -1,7 +1,8 @@
 package com.daily_notes.notes.dao;
 
 import com.daily_notes.notes.entity.ShortNoteEntity;
-import com.daily_notes.notes.utility.IdGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.enhanced.dynamodb.*;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
@@ -17,13 +18,19 @@ import java.util.Map;
 public class ShortNoteDaoImpl implements ShortNoteDao {
     private final DynamoDbTable<ShortNoteEntity> table;
 
+    private final Logger logger = LoggerFactory.getLogger(ShortNoteDaoImpl.class.getName());
+
     public ShortNoteDaoImpl(DynamoDbEnhancedClient enhancedClient) {
         this.table = enhancedClient.table("short_note", TableSchema.fromBean(ShortNoteEntity.class));
     }
 
     @Override
-    public void createShortNote(ShortNoteEntity shortNoteEntity) {
+    public ShortNoteEntity createShortNote(ShortNoteEntity shortNoteEntity) {
         table.putItem(shortNoteEntity);
+        return table.getItem(Key.builder()
+                .partitionValue(shortNoteEntity.getUserId()).
+                sortValue(shortNoteEntity.getUniqueToken())
+                .build());
     }
 
     @Override
@@ -57,11 +64,16 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
     }
 
     @Override
-    public void deleteShortNoteById(String category, String userId, String noteId) {
-        /*table.deleteItem(Key.builder())
-                .partitionValue(userId)
-                .sortValue(noteId)
-                .build()
-        );*/
+    public void deleteShortNoteById(String userId, String noteId) {
+        ShortNoteEntity entity = table.getItem(Key.builder().partitionValue(userId).sortValue(noteId).build());
+        logger.info("Retrieved entity for deletion: {}", entity);
+
+        table.deleteItem(
+                Key.builder()
+                        .partitionValue(userId)
+                        .sortValue(noteId)
+                        .build()
+        );
+        logger.info("Short note deleted successfully for Short Note Id : {}", entity.getId());
     }
 }

@@ -3,7 +3,7 @@ package com.daily_note_dms.documents;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-//@SpringBootApplication
+@SpringBootApplication
 public class DocumentsApplication {
 
     public static void main(String[] args) {

@@ -75,9 +75,9 @@ public class ShortNoteController {
         return ResponseEntity.ok(Map.of("data", result));
     }
 
-    @DeleteMapping
-    public ResponseEntity<?> deleteShortNoteById(@RequestParam String category, @RequestHeader String userId, @PathVariable String shortNoteId) {
-        return new ResponseEntity<>(shortNoteService.deleteShortNoteById(category, userId, shortNoteId), HttpStatus.OK);
+    @DeleteMapping("/{shortNoteId}")
+    public ResponseEntity<?> deleteShortNoteById(@RequestHeader String userId,
+                                                 @PathVariable String shortNoteId) {
+        return new ResponseEntity<>(shortNoteService.deleteShortNoteById(userId, shortNoteId), HttpStatus.OK);
     }
-
 }

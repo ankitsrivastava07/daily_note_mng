@@ -8,7 +8,7 @@ import java.util.Map;
 
 public interface ShortNoteDao {
 
-    void createShortNote(ShortNoteEntity shortNoteEntity);
+    ShortNoteEntity createShortNote(ShortNoteEntity shortNoteEntity);
 
     //List<ShortNoteEntity> getAllShortNotes(String categoryId, String userId);
 
@@ -19,7 +19,7 @@ public interface ShortNoteDao {
             int limit,
             Map<String, AttributeValue> lastEvaluatedKey);
 
-    void deleteShortNoteById(String userId, String noteId, String id);
+    void deleteShortNoteById(String userId, String noteId);
 
     ShortNoteEntity getShortNoteById(String userId, String shortNoteId);
 }
