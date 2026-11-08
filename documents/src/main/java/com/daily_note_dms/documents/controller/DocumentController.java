@@ -23,6 +23,7 @@ public class DocumentController {
     @PostMapping
     public ResponseEntity<?> saveDocument(@PathVariable String referenceId,
                                           @RequestBody List<DocumentDto> documentDtos) {
+        logger.info("Save Document Start for referenceId {} " + referenceId + " and documentDtos {} " + documentDtos);
         return new ResponseEntity<>(documentService
                 .saveDocument(referenceId, documentDtos),
                 HttpStatus.CREATED);
