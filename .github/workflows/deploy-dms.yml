@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout source code
+      # 1. Checkout GitHub repository
       - name: Checkout source code
         uses: actions/checkout@v4
 
@@ -34,13 +34,14 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ECR_ACCESSKEY }}
+          aws-secret-access-key: ${{ secrets.AWS_ECR_SECRET_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       # 3. Verify AWS identity
       - name: Verify AWS identity
-        run: aws sts get-caller-identity
+        run: |
+          aws sts get-caller-identity
 
       # 4. Login to Amazon ECR
       - name: Login to Amazon ECR
@@ -63,7 +64,7 @@ jobs:
             ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
             ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
-      # 7. Deploy exact image built by this workflow
+      # 7. Update existing Lambda function
       - name: Update DMS Lambda
         run: |
           IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${GITHUB_SHA}"
@@ -75,14 +76,14 @@ jobs:
             --image-uri "$IMAGE_URI" \
             --region "$AWS_REGION"
 
-      # 8. Wait until Lambda update completes
+      # 8. Wait for Lambda update
       - name: Wait for Lambda deployment
         run: |
           aws lambda wait function-updated-v2 \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --region "$AWS_REGION"
 
-      # 9. Verify deployment
+      # 9. Verify Lambda deployment
       - name: Verify Lambda deployment
         run: |
           aws lambda get-function-configuration \
@@ -112,4 +113,5 @@ jobs:
 
       # 10. Deployment completed
       - name: Deployment completed
-        run: echo "Daily Note DMS deployment completed successfully!"
+        run: |
+          echo "Daily Note DMS deployment completed successfully!"
