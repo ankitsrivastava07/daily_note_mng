@@ -31,29 +31,29 @@ jobs:
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # 2. Verify project files
-      - name: Verify project structure
+      # 2. Verify DMS project files
+      - name: Verify DMS project structure
         run: |
-          echo "Checking project files..."
+          echo "Checking DMS project..."
 
-          ls -la
+          ls -la documents/
 
-          if [ ! -f Dockerfile ]; then
-            echo "ERROR: Dockerfile not found in repository root"
+          test -f documents/Dockerfile || {
+            echo "ERROR: documents/Dockerfile not found"
             exit 1
-          fi
+          }
 
-          if [ ! -f pom.xml ]; then
-            echo "ERROR: pom.xml not found in repository root"
+          test -f documents/pom.xml || {
+            echo "ERROR: documents/pom.xml not found"
             exit 1
-          fi
+          }
 
-          if [ ! -d src ]; then
-            echo "ERROR: src directory not found"
+          test -d documents/src || {
+            echo "ERROR: documents/src not found"
             exit 1
-          fi
+          }
 
-          echo "Project structure verified successfully."
+          echo "DMS project structure verified!"
 
       # 3. Configure AWS credentials
       - name: Configure AWS credentials
@@ -76,12 +76,12 @@ jobs:
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 7. Build and push Docker image
+      # 7. Build and push DMS Docker image
       - name: Build and Push DMS Image
         uses: docker/build-push-action@v6
         with:
-          context: .
-          file: ./Dockerfile
+          context: ./documents
+          file: ./documents/Dockerfile
           platforms: linux/amd64
           push: true
           provenance: false
@@ -94,22 +94,21 @@ jobs:
         run: |
           IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${GITHUB_SHA}"
 
-          echo "Deploying image:"
-          echo "$IMAGE_URI"
+          echo "Deploying image: $IMAGE_URI"
 
           aws lambda update-function-code \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --image-uri "$IMAGE_URI" \
             --region "$AWS_REGION"
 
-      # 9. Wait for Lambda update
+      # 9. Wait for Lambda deployment
       - name: Wait for Lambda deployment
         run: |
           aws lambda wait function-updated-v2 \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --region "$AWS_REGION"
 
-      # 10. Verify deployment
+      # 10. Verify Lambda deployment
       - name: Verify Lambda deployment
         run: |
           aws lambda get-function-configuration \
@@ -140,6 +139,6 @@ jobs:
       # 11. Deployment completed
       - name: Deployment completed
         run: |
-          echo "=================================="
+          echo "======================================"
           echo "Daily Note DMS Deployment SUCCESS"
-          echo "=================================="
+          echo "======================================"
