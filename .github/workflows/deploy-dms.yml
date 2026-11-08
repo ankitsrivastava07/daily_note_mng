@@ -1,0 +1,144 @@
+
+name: Deploy Daily Note DMS to AWS Lambda
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-note-dms-deployment
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: "446394402725"
+  ECR_REPOSITORY: daily_note_dms
+  LAMBDA_FUNCTION_NAME: daily_note_dms
+
+jobs:
+  deploy:
+    name: Build and Deploy DMS
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # 1. Checkout source code
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # 2. Verify DMS project files
+      - name: Verify DMS project structure
+        run: |
+          echo "Checking DMS project..."
+
+          ls -la documents/
+
+          test -f documents/Dockerfile || {
+            echo "ERROR: documents/Dockerfile not found"
+            exit 1
+          }
+
+          test -f documents/pom.xml || {
+            echo "ERROR: documents/pom.xml not found"
+            exit 1
+          }
+
+          test -d documents/src || {
+            echo "ERROR: documents/src not found"
+            exit 1
+          }
+
+          echo "DMS project structure verified!"
+
+      # 3. Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ECR_ACCESSKEY }}
+          aws-secret-access-key: ${{ secrets.AWS_ECR_SECRET_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 4. Verify AWS identity
+      - name: Verify AWS identity
+        run: |
+          aws sts get-caller-identity
+
+      # 5. Login to Amazon ECR
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 6. Setup Docker Buildx
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 7. Build and push DMS Docker image
+      - name: Build and Push DMS Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./documents
+          file: ./documents/Dockerfile
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+      # 8. Update existing Lambda function
+      - name: Update DMS Lambda
+        run: |
+          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${GITHUB_SHA}"
+
+          echo "Deploying image: $IMAGE_URI"
+
+          aws lambda update-function-code \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --image-uri "$IMAGE_URI" \
+            --region "$AWS_REGION"
+
+      # 9. Wait for Lambda deployment
+      - name: Wait for Lambda deployment
+        run: |
+          aws lambda wait function-updated-v2 \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION"
+
+      # 10. Verify Lambda deployment
+      - name: Verify Lambda deployment
+        run: |
+          aws lambda get-function-configuration \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION" \
+            --query '[FunctionName,State,LastUpdateStatus,LastUpdateStatusReason]' \
+            --output table
+
+          STATE=$(aws lambda get-function-configuration \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION" \
+            --query 'State' \
+            --output text)
+
+          UPDATE_STATUS=$(aws lambda get-function-configuration \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION" \
+            --query 'LastUpdateStatus' \
+            --output text)
+
+          if [ "$STATE" != "Active" ] || [ "$UPDATE_STATUS" != "Successful" ]; then
+            echo "Lambda deployment failed!"
+            exit 1
+          fi
+
+          echo "Lambda deployment successful!"
+
+      # 11. Deployment completed
+      - name: Deployment completed
+        run: |
+          echo "======================================"
+          echo "Daily Note DMS Deployment SUCCESS"
+          echo "======================================"
