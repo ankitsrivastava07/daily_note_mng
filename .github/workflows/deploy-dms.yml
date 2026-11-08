@@ -1,1 +1,106 @@
 
+name: Deploy Daily Note DMS to AWS Lambda
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: "446394402725"
+  ECR_REPOSITORY: daily_note_dms
+  LAMBDA_FUNCTION_NAME: daily_note_dms
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build and Deploy DMS
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout GitHub repository
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # 2. Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 3. Login to Amazon ECR
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 4. Setup Docker Buildx
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 5. Build and push Docker image
+      - name: Build and Push DMS Image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
+            ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+
+      # 6. Create Lambda if missing, otherwise update it
+      - name: Deploy DMS Lambda
+        env:
+          LAMBDA_ROLE: ${{ secrets.LAMBDA_EXECUTION_ROLE_ARN }}
+        run: |
+          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest"
+
+          if aws lambda get-function \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION" >/dev/null 2>&1; then
+
+            echo "Lambda exists. Updating image..."
+
+            aws lambda update-function-code \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --image-uri "$IMAGE_URI" \
+              --region "$AWS_REGION"
+
+            aws lambda wait function-updated \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --region "$AWS_REGION"
+
+          else
+
+            echo "Lambda does not exist. Creating function..."
+
+            aws lambda create-function \
+              --function-name "$LAMBDA_FUNCTION_NAME" \
+              --package-type Image \
+              --code ImageUri="$IMAGE_URI" \
+              --role "$LAMBDA_ROLE" \
+              --timeout 60 \
+              --memory-size 1024 \
+              --architectures x86_64 \
+              --region "$AWS_REGION"
+
+          fi
+
+      # 7. Deployment verification
+      - name: Verify Lambda deployment
+        run: |
+          aws lambda get-function \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION" \
+            --query 'Configuration.[FunctionName,State,LastUpdateStatus]' \
+            --output table
+
+      - name: Deployment completed
+        run: echo "Daily Note DMS deployment completed!"
