@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 
 function CreateShortNote() {
@@ -9,6 +10,7 @@ function CreateShortNote() {
     });
 
     const [isSuccess, setIsSuccess] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
     const [formErrors, setFormErrors] = useState({});
     const [apiError, setApiError] = useState("");
 
@@ -28,7 +30,7 @@ function CreateShortNote() {
         general: "General Interview",
         interview: "Interview",
         qbank: "Question Bank",
-        facebook: "FaceBook",
+        facebook: "Facebook",
         instagram: "Instagram",
         whatsapp: "WhatsApp",
         others: "Others"
@@ -122,32 +124,31 @@ function CreateShortNote() {
 
     // Form validation
     const validate = () => {
-        let errors = {};
-        let isValid = true;
+        const errors = {};
 
         if (!inputValue.title.trim()) {
             errors.title = "Title is required";
-            isValid = false;
         }
 
         if (!inputValue.content.trim()) {
             errors.content = "Content is required";
-            isValid = false;
         }
 
         if (!inputValue.categoryId) {
             errors.categoryId = "Please select a valid category";
-            isValid = false;
         }
 
         setFormErrors(errors);
 
-        return isValid;
+        return Object.keys(errors).length === 0;
     };
 
     // Save short note
-    const handleSubmit = (event) => {
+    const handleSubmit = async (event) => {
         event.preventDefault();
+
+        // Prevent multiple submissions
+        if (isLoading) return;
 
         const isValid = validate();
 
@@ -156,57 +157,61 @@ function CreateShortNote() {
             return;
         }
 
+        setIsLoading(true);
         setIsSuccess(null);
         setApiError("");
 
-        fetch(
-            `${import.meta.env.VITE_API_BASE_URL}/api/v1/short-note`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    userId: "ankit0397"
-                },
-                body: JSON.stringify(inputValue)
-            }
-        )
-            .then(async (response) => {
-                const data = await response.json();
-
-                if (!response.ok || data.success === false) {
-                    setApiError(
-                        data.message ||
-                        `Request failed (${response.status})`
-                    );
-
-                    throw new Error(
-                        data.message ||
-                        `Request failed (${response.status})`
-                    );
+        try {
+            const response = await fetch(
+                `${import.meta.env.VITE_API_BASE_URL}/api/v1/short-note`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        userId: "ankit0397"
+                    },
+                    body: JSON.stringify(inputValue)
                 }
+            );
 
-                return data;
-            })
-            .then(() => {
-                setIsSuccess(true);
-                setApiError("");
+            const data = await response.json().catch(() => ({}));
 
-                setInputValue({
-                    title: "",
-                    content: "",
-                    categoryId: "others",
-                    userId: "ankit0397"
-                });
-            })
-            .catch((error) => {
-                console.error("Error saving short note:", error);
-                setIsSuccess(false);
+            if (!response.ok || data.success === false) {
+                throw new Error(
+                    data.message || `Request failed (${response.status})`
+                );
+            }
+
+            setIsSuccess(true);
+            setApiError("");
+
+            setInputValue({
+                title: "",
+                content: "",
+                categoryId: "others",
+                userId: "ankit0397"
             });
+
+            setFormErrors({});
+
+        } catch (error) {
+            console.error("Error saving short note:", error);
+
+            setIsSuccess(false);
+
+            setApiError(
+                error.message ||
+                "An error occurred while saving the note. Please try again."
+            );
+
+        } finally {
+            // Enable button only after API response/error
+            setIsLoading(false);
+        }
     };
 
     return (
         <>
-            {/* Custom CSS */}
             <style>{`
                 .main-card {
                     transition: all 0.3s ease;
@@ -233,10 +238,16 @@ function CreateShortNote() {
                     transition: all 0.2s ease-in-out;
                 }
 
-                .custom-submit-btn:hover {
+                .custom-submit-btn:hover:not(:disabled) {
                     transform: translateY(-2px);
                     box-shadow: 0 6px 15px rgba(13, 110, 253, 0.3) !important;
                     background-color: #0b5ed7 !important;
+                }
+
+                .custom-submit-btn:disabled {
+                    opacity: 0.7;
+                    cursor: not-allowed;
+                    transform: none;
                 }
 
                 .form-control:focus {
@@ -256,13 +267,11 @@ function CreateShortNote() {
 
                         {/* Category Selection */}
                         <div className="mb-3">
-
                             <label className="form-label fw-semibold text-secondary small text-uppercase">
                                 Category
                             </label>
 
                             <div className="dropdown">
-
                                 <a
                                     className="btn btn-outline-secondary custom-dropdown-btn dropdown-toggle d-flex justify-content-between align-items-center"
                                     href="#"
@@ -281,7 +290,6 @@ function CreateShortNote() {
                                 </a>
 
                                 <ul className="dropdown-menu shadow border-0 py-2 rounded-3">
-
                                     <li>
                                         <a
                                             className="dropdown-item py-2 px-3"
@@ -323,7 +331,6 @@ function CreateShortNote() {
 
                                     {/* Nested Social Media Menu */}
                                     <li className="dropend">
-
                                         <a
                                             className="dropdown-item dropdown-toggle py-2 px-3"
                                             href="#"
@@ -335,7 +342,6 @@ function CreateShortNote() {
                                         </a>
 
                                         <ul className="dropdown-menu shadow border-0 py-2 rounded-3">
-
                                             <li>
                                                 <a
                                                     className="dropdown-item py-2 px-3"
@@ -345,7 +351,7 @@ function CreateShortNote() {
                                                         handleCategorySelect("facebook");
                                                     }}
                                                 >
-                                                    FaceBook
+                                                    Facebook
                                                 </a>
                                             </li>
 
@@ -374,7 +380,6 @@ function CreateShortNote() {
                                                     WhatsApp
                                                 </a>
                                             </li>
-
                                         </ul>
                                     </li>
 
@@ -394,7 +399,6 @@ function CreateShortNote() {
                                             Others
                                         </a>
                                     </li>
-
                                 </ul>
                             </div>
 
@@ -403,12 +407,10 @@ function CreateShortNote() {
                                     {formErrors.categoryId}
                                 </div>
                             )}
-
                         </div>
 
                         {/* Note Title */}
                         <div className="mb-3">
-
                             <label
                                 htmlFor="exampleFormControlInput1"
                                 className="form-label fw-semibold text-secondary small text-uppercase"
@@ -424,28 +426,19 @@ function CreateShortNote() {
                                 className="form-control py-2 shadow-none"
                                 id="exampleFormControlInput1"
                                 placeholder="Short Note Name"
+                                disabled={isLoading}
                             />
-
-                            {isSuccess === false && (
-                                <div className="text-danger mt-1 small">
-                                    {apiError ||
-                                        "An error occurred while saving the note. Please try again."}
-                                </div>
-                            )}
 
                             {formErrors.title && (
                                 <div className="text-danger mt-1 small">
                                     {formErrors.title}
                                 </div>
                             )}
-
                         </div>
 
                         {/* Description */}
                         <div className="mb-3">
-
                             <div className="d-flex justify-content-between align-items-center mb-1">
-
                                 <label
                                     htmlFor="exampleFormControlTextarea1"
                                     className="form-label fw-semibold text-secondary small text-uppercase mb-0"
@@ -463,7 +456,6 @@ function CreateShortNote() {
                                     </kbd>{" "}
                                     for bold
                                 </small>
-
                             </div>
 
                             <textarea
@@ -475,6 +467,7 @@ function CreateShortNote() {
                                 id="exampleFormControlTextarea1"
                                 rows={10}
                                 placeholder="Description"
+                                disabled={isLoading}
                                 style={{
                                     fontFamily: "monospace",
                                     fontSize: "14px"
@@ -486,15 +479,34 @@ function CreateShortNote() {
                                     {formErrors.content}
                                 </div>
                             )}
-
                         </div>
+
+                        {/* API Error */}
+                        {isSuccess === false && (
+                            <div className="alert alert-danger mt-3 py-2" role="alert">
+                                {apiError ||
+                                    "An error occurred while saving the note. Please try again."}
+                            </div>
+                        )}
 
                         {/* Submit Button */}
                         <button
                             type="submit"
+                            disabled={isLoading}
                             className="btn btn-primary mt-2 px-4 py-2 custom-submit-btn fw-semibold rounded-3 shadow-sm"
                         >
-                            Submit
+                            {isLoading ? (
+                                <>
+                                    <span
+                                        className="spinner-border spinner-border-sm me-2"
+                                        role="status"
+                                        aria-hidden="true"
+                                    ></span>
+                                    Saving...
+                                </>
+                            ) : (
+                                "Submit"
+                            )}
                         </button>
 
                         {/* Success Message */}
