@@ -26,11 +26,36 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout GitHub repository
+
+      # 1. Checkout source code
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # 2. Configure AWS credentials
+      # 2. Verify project files
+      - name: Verify project structure
+        run: |
+          echo "Checking project files..."
+
+          ls -la
+
+          if [ ! -f Dockerfile ]; then
+            echo "ERROR: Dockerfile not found in repository root"
+            exit 1
+          fi
+
+          if [ ! -f pom.xml ]; then
+            echo "ERROR: pom.xml not found in repository root"
+            exit 1
+          fi
+
+          if [ ! -d src ]; then
+            echo "ERROR: src directory not found"
+            exit 1
+          fi
+
+          echo "Project structure verified successfully."
+
+      # 3. Configure AWS credentials
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -38,20 +63,20 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_ECR_SECRET_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 3. Verify AWS identity
+      # 4. Verify AWS identity
       - name: Verify AWS identity
         run: |
           aws sts get-caller-identity
 
-      # 4. Login to Amazon ECR
+      # 5. Login to Amazon ECR
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 5. Setup Docker Buildx
+      # 6. Setup Docker Buildx
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # 6. Build and push Docker image
+      # 7. Build and push Docker image
       - name: Build and Push DMS Image
         uses: docker/build-push-action@v6
         with:
@@ -64,26 +89,27 @@ jobs:
             ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
             ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
 
-      # 7. Update existing Lambda function
+      # 8. Update existing Lambda function
       - name: Update DMS Lambda
         run: |
           IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${GITHUB_SHA}"
 
-          echo "Deploying image: $IMAGE_URI"
+          echo "Deploying image:"
+          echo "$IMAGE_URI"
 
           aws lambda update-function-code \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --image-uri "$IMAGE_URI" \
             --region "$AWS_REGION"
 
-      # 8. Wait for Lambda update
+      # 9. Wait for Lambda update
       - name: Wait for Lambda deployment
         run: |
           aws lambda wait function-updated-v2 \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --region "$AWS_REGION"
 
-      # 9. Verify Lambda deployment
+      # 10. Verify deployment
       - name: Verify Lambda deployment
         run: |
           aws lambda get-function-configuration \
@@ -105,13 +131,15 @@ jobs:
             --output text)
 
           if [ "$STATE" != "Active" ] || [ "$UPDATE_STATUS" != "Successful" ]; then
-            echo "Lambda deployment verification failed!"
+            echo "Lambda deployment failed!"
             exit 1
           fi
 
-          echo "Lambda deployment verified successfully!"
+          echo "Lambda deployment successful!"
 
-      # 10. Deployment completed
+      # 11. Deployment completed
       - name: Deployment completed
         run: |
-          echo "Daily Note DMS deployment completed successfully!"
+          echo "=================================="
+          echo "Daily Note DMS Deployment SUCCESS"
+          echo "=================================="
