@@ -27,10 +27,7 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
     @Override
     public ShortNoteEntity createShortNote(ShortNoteEntity shortNoteEntity) {
         table.putItem(shortNoteEntity);
-        return table.getItem(Key.builder()
-                .partitionValue(shortNoteEntity.getUserId()).
-                sortValue(shortNoteEntity.getUniqueToken())
-                .build());
+        return shortNoteEntity;
     }
 
     @Override

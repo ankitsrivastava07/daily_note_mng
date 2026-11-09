@@ -10,6 +10,7 @@ import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.annotations.NotNull;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -45,7 +46,7 @@ public class DocumentServiceImpl implements DocumentService {
             fileEntity.setContentType(e.getContentType());
             fileEntity.setCreatedAt(LocalDate.now());
             fileEntity.setUserId(e.getUserId());
-            fileEntity.setId(String.valueOf(System.nanoTime()+1));
+            fileEntity.setId(String.valueOf(System.nanoTime() + 1));
             return fileEntity;
         }).collect(Collectors.toList());
 

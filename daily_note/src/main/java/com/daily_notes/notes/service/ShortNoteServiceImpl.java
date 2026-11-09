@@ -41,12 +41,10 @@ public class ShortNoteServiceImpl implements ShortNoteService {
                         ShortNoteEntity.class
                 );
 
-        entity.setId(UUID.randomUUID().toString());
         // Always generate creation timestamp on backend
         Instant createdAt = Instant.now();
         entity.setCreatedAt(createdAt);
         entity.setUpdateAt(createdAt);
-
         String token = TokenUtil.generateToken(
                 createShortNoteDto.userId(),
                 createShortNoteDto.title()
