@@ -35,6 +35,7 @@ function CreateShortNote() {
     const fileInputRef = useRef(null);
     const textareaRef = useRef(null);
 
+    // Clear success message
     useEffect(() => {
         if (isSuccess !== true) return;
 
@@ -45,16 +46,18 @@ function CreateShortNote() {
         return () => clearTimeout(timer);
     }, [isSuccess]);
 
+    // Cleanup image previews on unmount
     useEffect(() => {
         return () => {
-            files.forEach(file => {
-                if (file.previewUrl) {
-                    URL.revokeObjectURL(file.previewUrl);
+            files.forEach(item => {
+                if (item.previewUrl) {
+                    URL.revokeObjectURL(item.previewUrl);
                 }
             });
         };
     }, [files]);
 
+    // Handle form inputs
     const handleInputValue = (e) => {
         const { name, value } = e.target;
 
@@ -63,12 +66,10 @@ function CreateShortNote() {
             [name]: value
         }));
 
-        if (formErrors[name]) {
-            setFormErrors(prev => ({
-                ...prev,
-                [name]: ""
-            }));
-        }
+        setFormErrors(prev => ({
+            ...prev,
+            [name]: ""
+        }));
     };
 
     // Ctrl+B formatting
@@ -122,6 +123,7 @@ function CreateShortNote() {
         }
     };
 
+    // Category selection
     const handleCategorySelect = (categoryKey) => {
         setInputValue(prev => ({
             ...prev,
@@ -134,7 +136,7 @@ function CreateShortNote() {
         }));
     };
 
-    // Add selected files or pasted images
+    // Add attachments
     const addFiles = (incomingFiles) => {
         const validFiles = Array.from(incomingFiles || []);
 
@@ -150,12 +152,6 @@ function CreateShortNote() {
 
             const accepted = validFiles.slice(0, remaining);
 
-            if (accepted.length < validFiles.length) {
-                setApiError("Maximum 5 attachments are allowed.");
-            } else {
-                setApiError("");
-            }
-
             const newFiles = accepted.map(file => ({
                 file,
                 id: `${Date.now()}-${Math.random()}`,
@@ -163,6 +159,12 @@ function CreateShortNote() {
                     ? URL.createObjectURL(file)
                     : null
             }));
+
+            setApiError(
+                accepted.length < validFiles.length
+                    ? "Maximum 5 attachments are allowed."
+                    : ""
+            );
 
             return [...previous, ...newFiles];
         });
@@ -190,13 +192,13 @@ function CreateShortNote() {
                     const extension =
                         file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
 
-                    const namedFile = new File(
-                        [file],
-                        `pasted-image-${Date.now()}.${extension}`,
-                        { type: file.type }
+                    pastedImages.push(
+                        new File(
+                            [file],
+                            `pasted-image-${Date.now()}.${extension}`,
+                            { type: file.type }
+                        )
                     );
-
-                    pastedImages.push(namedFile);
                 }
             }
         }
@@ -220,11 +222,15 @@ function CreateShortNote() {
         });
     };
 
-    // Parse API response
+    // Read API response
     const readResponse = async (response) => {
         const data = await response.json().catch(() => ({}));
 
-        if (!response.ok || data.success === false || data.status === false) {
+        if (
+            !response.ok ||
+            data.success === false ||
+            data.status === false
+        ) {
             throw new Error(
                 data.message || `Request failed (${response.status})`
             );
@@ -233,7 +239,7 @@ function CreateShortNote() {
         return data;
     };
 
-    // Extract generated note ID
+    // Extract note ID
     const extractReferenceId = (response) => {
         const data = response?.data;
 
@@ -249,7 +255,7 @@ function CreateShortNote() {
         );
     };
 
-    // Step 1: Create short note
+    // API 1: Create Short Note
     const createShortNote = async () => {
         const response = await fetch(
             `${API_BASE_URL}/api/v1/short-note`,
@@ -266,7 +272,7 @@ function CreateShortNote() {
         return await readResponse(response);
     };
 
-    // Step 2: Generate DMS presigned URLs
+    // API 2: Generate DMS presigned URLs
     const generatePresignedUrls = async (referenceId) => {
         const params = new URLSearchParams();
 
@@ -285,7 +291,6 @@ function CreateShortNote() {
         );
 
         const result = await readResponse(response);
-
         const urls = result.data;
 
         if (!Array.isArray(urls) || urls.length !== files.length) {
@@ -297,7 +302,7 @@ function CreateShortNote() {
         return urls;
     };
 
-    // Step 3: Upload files directly to S3
+    // API 3: Upload directly to S3
     const uploadFilesToS3 = async (urls) => {
         for (let i = 0; i < files.length; i++) {
             const item = files[i];
@@ -323,7 +328,7 @@ function CreateShortNote() {
         }
     };
 
-    // Step 4: Save document metadata in DMS
+    // API 4: Save DMS metadata
     const saveDocumentMetadata = async (referenceId) => {
         const documentDtos = files.map(item => ({
             fileName: item.file.name,
@@ -347,7 +352,7 @@ function CreateShortNote() {
         await readResponse(response);
     };
 
-    // Validation
+    // Form validation
     const validate = () => {
         const errors = {};
 
@@ -372,7 +377,7 @@ function CreateShortNote() {
         return Object.keys(errors).length === 0;
     };
 
-    // Submit note and attachments
+    // Submit Short Note
     const handleSubmit = async (event) => {
         event.preventDefault();
 
@@ -383,12 +388,14 @@ function CreateShortNote() {
             return;
         }
 
+        // Short Note API configuration
         if (!API_BASE_URL) {
             setApiError("VITE_API_BASE_URL is not configured.");
             setIsSuccess(false);
             return;
         }
 
+        // DMS configuration required ONLY if files exist
         if (files.length > 0 && !DMS_API_BASE_URL) {
             setApiError("VITE_DMS_API_BASE_URL is not configured.");
             setIsSuccess(false);
@@ -403,36 +410,38 @@ function CreateShortNote() {
         let noteCreated = false;
 
         try {
-            // Create note first
+            // STEP 1: ALWAYS call Short Note API
             setUploadProgress("Saving short note...");
 
             const noteResponse = await createShortNote();
             noteCreated = true;
 
-            // Attachments are optional
+            // STEP 2: DMS and S3 ONLY when attachments exist
             if (files.length > 0) {
+
                 const referenceId = extractReferenceId(noteResponse);
 
                 if (!referenceId) {
                     throw new Error(
-                        "Note was saved, but its ID was not found in the API response. Please check your Short Note API response structure."
+                        "Note saved, but reference ID was not returned."
                     );
                 }
 
-                // Generate URLs
+                // Generate presigned URLs
                 setUploadProgress("Generating document upload URLs...");
 
                 const urls = await generatePresignedUrls(referenceId);
 
-                // Upload to S3
+                // Upload attachments to S3
                 await uploadFilesToS3(urls);
 
-                // Save metadata
+                // Save metadata in DMS
                 setUploadProgress("Saving document information...");
 
                 await saveDocumentMetadata(referenceId);
             }
 
+            // STEP 3: Success
             setIsSuccess(true);
             setApiError("");
 
@@ -443,6 +452,7 @@ function CreateShortNote() {
                 userId: USER_ID
             });
 
+            // Clear attachments and previews
             setFiles(previous => {
                 previous.forEach(item => {
                     if (item.previewUrl) {
@@ -454,6 +464,7 @@ function CreateShortNote() {
             });
 
             setFormErrors({});
+
         } catch (error) {
             console.error("Short Note / DMS error:", error);
 
@@ -464,6 +475,7 @@ function CreateShortNote() {
                     ? `Short Note was saved, but attachment processing failed: ${error.message}`
                     : error.message || "Unable to save Short Note."
             );
+
         } finally {
             setIsLoading(false);
             setUploadProgress("");
@@ -579,6 +591,7 @@ function CreateShortNote() {
                                                 <button
                                                     type="button"
                                                     className="dropdown-item py-2 px-3"
+                                                    disabled={isLoading}
                                                     onClick={() => handleCategorySelect(key)}
                                                 >
                                                     {label}
@@ -627,8 +640,7 @@ function CreateShortNote() {
                                 </label>
 
                                 <small className="text-muted">
-                                    Select text and press{" "}
-                                    <kbd>Ctrl + B</kbd> for bold
+                                    Select text and press <kbd>Ctrl + B</kbd> for bold
                                 </small>
                             </div>
 
@@ -696,6 +708,12 @@ function CreateShortNote() {
                                 <div className="small text-muted mt-2">
                                     Maximum 5 files. Images and documents are supported.
                                 </div>
+
+                                {formErrors.files && (
+                                    <div className="text-danger mt-1 small">
+                                        {formErrors.files}
+                                    </div>
+                                )}
 
                                 {files.length > 0 && (
                                     <div className="row g-2 mt-2">
@@ -785,7 +803,9 @@ function CreateShortNote() {
                                 className="alert alert-success mt-3 py-2 text-center"
                                 role="alert"
                             >
-                                Note and attachments saved successfully!
+                                {files.length > 0
+                                    ? "Note and attachments saved successfully!"
+                                    : "Note saved successfully!"}
                             </div>
                         )}
 
