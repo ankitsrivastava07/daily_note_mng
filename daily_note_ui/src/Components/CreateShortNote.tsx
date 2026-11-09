@@ -399,6 +399,7 @@ function CreateShortNote() {
         }
 
         if (files.length > 0 && !DMS_API_BASE_URL) {
+            console.log("DMS API base URL is not configured.", DMS_API_BASE_URL + " --- IGNORE --- " + files.length);
             setApiError("VITE_DMS_API_BASE_URL is not configured.");
             setIsSuccess(false);
             return;
