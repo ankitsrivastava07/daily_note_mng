@@ -2,6 +2,7 @@ package com.daily_note_dms.documents.controller;
 
 import com.daily_note_dms.documents.dto.DocumentDto;
 import com.daily_note_dms.documents.service.DocumentService;
+import jakarta.validation.Valid;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -10,6 +11,9 @@ import software.amazon.awssdk.annotations.NotNull;
 
 import java.util.List;
 import java.util.logging.Logger;
+
+import jakarta.validation.constraints.NotBlank;
+import org.springframework.validation.annotation.Validated;
 
 @RestController
 @RequestMapping("/api/v1/{referenceId}/dms")
@@ -24,7 +28,7 @@ public class DocumentController {
     }
 
     @PostMapping
-    public ResponseEntity<?> saveDocument(@PathVariable @NotNull String referenceId,
+    public ResponseEntity<?> saveDocument(@PathVariable @Valid @NotNull @NotBlank(message = "Reference ID is required") String referenceId,
                                           @RequestBody List<DocumentDto> documentDtos) {
         logger.info("Save Document Start for referenceId {} " + referenceId + " and documentDtos {} " + documentDtos);
         return new ResponseEntity<>(documentService
@@ -44,7 +48,10 @@ public class DocumentController {
     }*/
 
     @GetMapping("/presigned")
-    public ResponseEntity<?> createPresignedURL(@PathVariable String referenceId,
+    public ResponseEntity<?> createPresignedURL(@PathVariable @Validated
+                                                @NotNull
+                                                @NotBlank(message = "Reference ID is required")
+                                                String referenceId,
                                                 @RequestParam List<String> fileName) {
         logger.info("createPresignedURL Start for referenceId {} " + referenceId + " and fileName {} " + fileName);
         return new ResponseEntity<>(documentService
