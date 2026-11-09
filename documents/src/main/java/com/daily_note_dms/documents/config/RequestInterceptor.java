@@ -1,4 +1,3 @@
-/*
 package com.daily_note_dms.documents.config;
 
 import io.github.bucket4j.Bucket;
@@ -24,4 +23,3 @@ public class RequestInterceptor implements HandlerInterceptor {
         return false;
     }
 }
-*/
