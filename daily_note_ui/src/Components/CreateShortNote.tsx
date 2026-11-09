@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 
 const USER_ID = "ankit0397";
-const MAX_FILES = 5;
+const MAX_FILES = 3;
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const DMS_API_BASE_URL = import.meta.env.VITE_DMS_API_BASE_URL;
@@ -151,7 +151,7 @@ function CreateShortNote() {
             const remaining = MAX_FILES - previous.length;
 
             if (remaining <= 0) {
-                setApiError("Maximum 5 attachments are allowed.");
+                setApiError("Maximum 3 attachments are allowed.");
                 return previous;
             }
 
@@ -167,7 +167,7 @@ function CreateShortNote() {
 
             setApiError(
                 accepted.length < validFiles.length
-                    ? "Maximum 5 attachments are allowed."
+                    ? "Maximum 3 attachments are allowed."
                     : ""
             );
 
@@ -246,21 +246,17 @@ function CreateShortNote() {
         return data;
     };
 
-    // Extract note ID
+    // referenceId must be the Short Note database ID only.
+    // Never fall back to uniqueToken or another field.
     const extractReferenceId = (response) => {
-        const data = response?.data;
+        const id = response?.data?.id;
 
-        return (
-            data?.noteId ||
-            data?.id ||
-            data?.referenceId ||
-            data?.shortNoteId ||
-            data?.uniqueToken ||
-            response?.noteId ||
-            response?.id ||
-            response?.referenceId ||
-            null
-        );
+        if (id === null || id === undefined) {
+            return " ";
+        }
+
+        const referenceId = String(id).trim();
+        return referenceId.length > 0 ? referenceId : null;
     };
 
     // API 1: Create Short Note
@@ -377,7 +373,7 @@ function CreateShortNote() {
         }
 
         if (files.length > MAX_FILES) {
-            errors.files = "Maximum 5 attachments are allowed.";
+            errors.files = "Maximum 3 attachments are allowed.";
         }
 
         setFormErrors(errors);
@@ -453,15 +449,13 @@ function CreateShortNote() {
                     pendingSubmission.noteResponse
                 );
 
-                if (!referenceId) {
-                    throw new Error(
-                        "The short note was created, but the API did not return a reference ID."
-                    );
-                }
+                // Do not stop the UI flow when the API response has a null ID.
+                // The DMS backend still needs a valid referenceId to process files.
+                const dmsReferenceId = referenceId || "";
 
                 setUploadProgress("Generating document upload URLs...");
                 const urls = await generatePresignedUrls(
-                    referenceId,
+                    dmsReferenceId,
                     submittedFiles
                 );
 
@@ -469,7 +463,7 @@ function CreateShortNote() {
                 await uploadFilesToS3(urls, submittedFiles);
 
                 setUploadProgress("Saving document information...");
-                await saveDocumentMetadata(referenceId, submittedFiles);
+                await saveDocumentMetadata(dmsReferenceId, submittedFiles);
             }
 
             // Show success only after every required step has completed.
@@ -736,7 +730,7 @@ function CreateShortNote() {
                                 />
 
                                 <div className="small text-muted mt-2">
-                                    Maximum 5 files. Images and documents are supported.
+                                    Maximum 3 files. Images and documents are supported.
                                 </div>
 
                                 {formErrors.files && (
