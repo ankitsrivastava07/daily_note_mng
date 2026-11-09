@@ -31,9 +31,16 @@ function CreateShortNote() {
     const [uploadProgress, setUploadProgress] = useState("");
     const [formErrors, setFormErrors] = useState({});
     const [apiError, setApiError] = useState("");
+    const [savedAttachmentCount, setSavedAttachmentCount] = useState(0);
 
     const fileInputRef = useRef(null);
     const textareaRef = useRef(null);
+    const pendingSubmissionRef = useRef(null);
+    const filesRef = useRef(files);
+
+    useEffect(() => {
+        filesRef.current = files;
+    }, [files]);
 
     // Clear success message
     useEffect(() => {
@@ -46,16 +53,14 @@ function CreateShortNote() {
         return () => clearTimeout(timer);
     }, [isSuccess]);
 
-    // Cleanup image previews on unmount
+    // Cleanup remaining image previews only when the component unmounts.
     useEffect(() => {
         return () => {
-            files.forEach(item => {
-                if (item.previewUrl) {
-                    URL.revokeObjectURL(item.previewUrl);
-                }
+            filesRef.current.forEach(item => {
+                if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
             });
         };
-    }, [files]);
+    }, []);
 
     // Handle form inputs
     const handleInputValue = (e) => {
@@ -218,7 +223,9 @@ function CreateShortNote() {
                 URL.revokeObjectURL(selected.previewUrl);
             }
 
-            return previous.filter(item => item.id !== id);
+            const updated = previous.filter(item => item.id !== id);
+            filesRef.current = updated;
+            return updated;
         });
     };
 
@@ -248,6 +255,7 @@ function CreateShortNote() {
             data?.id ||
             data?.referenceId ||
             data?.shortNoteId ||
+            data?.uniqueToken ||
             response?.noteId ||
             response?.id ||
             response?.referenceId ||
@@ -256,7 +264,7 @@ function CreateShortNote() {
     };
 
     // API 1: Create Short Note
-    const createShortNote = async () => {
+    const createShortNote = async (notePayload) => {
         const response = await fetch(
             `${API_BASE_URL}/api/v1/short-note`,
             {
@@ -265,7 +273,7 @@ function CreateShortNote() {
                     "Content-Type": "application/json",
                     userId: USER_ID
                 },
-                body: JSON.stringify(inputValue)
+                body: JSON.stringify(notePayload)
             }
         );
 
@@ -273,10 +281,10 @@ function CreateShortNote() {
     };
 
     // API 2: Generate DMS presigned URLs
-    const generatePresignedUrls = async (referenceId) => {
+    const generatePresignedUrls = async (referenceId, submittedFiles) => {
         const params = new URLSearchParams();
 
-        files.forEach(item => {
+        submittedFiles.forEach(item => {
             params.append("fileName", item.file.name);
         });
 
@@ -293,7 +301,7 @@ function CreateShortNote() {
         const result = await readResponse(response);
         const urls = result.data;
 
-        if (!Array.isArray(urls) || urls.length !== files.length) {
+        if (!Array.isArray(urls) || urls.length !== submittedFiles.length) {
             throw new Error(
                 "DMS did not return the expected number of presigned URLs."
             );
@@ -303,13 +311,13 @@ function CreateShortNote() {
     };
 
     // API 3: Upload directly to S3
-    const uploadFilesToS3 = async (urls) => {
-        for (let i = 0; i < files.length; i++) {
-            const item = files[i];
+    const uploadFilesToS3 = async (urls, submittedFiles) => {
+        for (let i = 0; i < submittedFiles.length; i++) {
+            const item = submittedFiles[i];
             const file = item.file;
 
             setUploadProgress(
-                `Uploading ${i + 1} of ${files.length}: ${file.name}`
+                `Uploading ${i + 1} of ${submittedFiles.length}: ${file.name}`
             );
 
             const response = await fetch(urls[i], {
@@ -329,8 +337,8 @@ function CreateShortNote() {
     };
 
     // API 4: Save DMS metadata
-    const saveDocumentMetadata = async (referenceId) => {
-        const documentDtos = files.map(item => ({
+    const saveDocumentMetadata = async (referenceId, submittedFiles) => {
+        const documentDtos = submittedFiles.map(item => ({
             fileName: item.file.name,
             fileSize: item.file.size,
             contentType: item.file.type || "application/octet-stream",
@@ -388,60 +396,84 @@ function CreateShortNote() {
             return;
         }
 
-        // Short Note API configuration
         if (!API_BASE_URL) {
             setApiError("VITE_API_BASE_URL is not configured.");
             setIsSuccess(false);
             return;
         }
 
-        // DMS configuration required ONLY if files exist
         if (files.length > 0 && !DMS_API_BASE_URL) {
             setApiError("VITE_DMS_API_BASE_URL is not configured.");
             setIsSuccess(false);
             return;
         }
 
+        // Use a stable snapshot so the same files are used throughout this request.
+        const submittedFiles = [...files];
+        const submittedFileCount = submittedFiles.length;
+        const notePayload = { ...inputValue };
+        const submissionSignature = JSON.stringify({
+            note: notePayload,
+            files: submittedFiles.map(({ file }) => ({
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                lastModified: file.lastModified
+            }))
+        });
+
         setIsLoading(true);
         setIsSuccess(null);
+        setSavedAttachmentCount(0);
         setApiError("");
         setUploadProgress("");
 
         let noteCreated = false;
 
         try {
-            // STEP 1: ALWAYS call Short Note API
-            setUploadProgress("Saving short note...");
+            // Reuse the created note when retrying the same failed submission.
+            let pendingSubmission = pendingSubmissionRef.current;
 
-            const noteResponse = await createShortNote();
+            if (!pendingSubmission ||
+                pendingSubmission.signature !== submissionSignature) {
+                setUploadProgress("Saving short note...");
+
+                const noteResponse = await createShortNote(notePayload);
+                pendingSubmission = {
+                    signature: submissionSignature,
+                    noteResponse
+                };
+                pendingSubmissionRef.current = pendingSubmission;
+            }
+
             noteCreated = true;
 
-            // STEP 2: DMS and S3 ONLY when attachments exist
-            if (files.length > 0) {
-
-                const referenceId = extractReferenceId(noteResponse);
+            if (submittedFileCount > 0) {
+                const referenceId = extractReferenceId(
+                    pendingSubmission.noteResponse
+                );
 
                 if (!referenceId) {
                     throw new Error(
-                        "Note saved, but reference ID was not returned."
+                        "The short note was created, but the API did not return a reference ID."
                     );
                 }
 
-                // Generate presigned URLs
                 setUploadProgress("Generating document upload URLs...");
+                const urls = await generatePresignedUrls(
+                    referenceId,
+                    submittedFiles
+                );
 
-                const urls = await generatePresignedUrls(referenceId);
+                // All S3 uploads must succeed before metadata is saved.
+                await uploadFilesToS3(urls, submittedFiles);
 
-                // Upload attachments to S3
-                await uploadFilesToS3(urls);
-
-                // Save metadata in DMS
                 setUploadProgress("Saving document information...");
-
-                await saveDocumentMetadata(referenceId);
+                await saveDocumentMetadata(referenceId, submittedFiles);
             }
 
-            // STEP 3: Success
+            // Show success only after every required step has completed.
+            setSavedAttachmentCount(submittedFileCount);
             setIsSuccess(true);
             setApiError("");
 
@@ -452,30 +484,28 @@ function CreateShortNote() {
                 userId: USER_ID
             });
 
-            // Clear attachments and previews
-            setFiles(previous => {
-                previous.forEach(item => {
-                    if (item.previewUrl) {
-                        URL.revokeObjectURL(item.previewUrl);
-                    }
-                });
-
-                return [];
+            submittedFiles.forEach(item => {
+                if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
             });
 
+            filesRef.current = [];
+            setFiles([]);
             setFormErrors({});
+            pendingSubmissionRef.current = null;
+
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
 
         } catch (error) {
             console.error("Short Note / DMS error:", error);
-
             setIsSuccess(false);
 
             setApiError(
                 noteCreated
-                    ? `Short Note was saved, but attachment processing failed: ${error.message}`
-                    : error.message || "Unable to save Short Note."
+                    ? `Short note was created, but attachment processing did not complete: ${error.message}. Your form and attachments are still available. Submit again to retry.`
+                    : error.message || "Unable to save the short note. Please try again."
             );
-
         } finally {
             setIsLoading(false);
             setUploadProgress("");
@@ -803,8 +833,8 @@ function CreateShortNote() {
                                 className="alert alert-success mt-3 py-2 text-center"
                                 role="alert"
                             >
-                                {files.length > 0
-                                    ? "Note and attachments saved successfully!"
+                                {savedAttachmentCount > 0
+                                    ? `Note and ${savedAttachmentCount} attachment(s) saved successfully!`
                                     : "Note saved successfully!"}
                             </div>
                         )}
