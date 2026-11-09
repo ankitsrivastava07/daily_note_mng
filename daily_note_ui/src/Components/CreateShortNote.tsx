@@ -1,20 +1,40 @@
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const USER_ID = "ankit0397";
+const MAX_FILES = 5;
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const DMS_API_BASE_URL = import.meta.env.VITE_DMS_API_BASE_URL;
+
+const categoryLabels = {
+    general: "General Interview",
+    interview: "Interview",
+    qbank: "Question Bank",
+    facebook: "Facebook",
+    instagram: "Instagram",
+    whatsapp: "WhatsApp",
+    others: "Others"
+};
 
 function CreateShortNote() {
     const [inputValue, setInputValue] = useState({
         title: "",
         content: "",
         categoryId: "others",
-        userId: "ankit0397"
+        userId: USER_ID
     });
 
+    const [files, setFiles] = useState([]);
     const [isSuccess, setIsSuccess] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState("");
     const [formErrors, setFormErrors] = useState({});
     const [apiError, setApiError] = useState("");
 
-    // Automatically hide success message after 3 seconds
+    const fileInputRef = useRef(null);
+    const textareaRef = useRef(null);
+
     useEffect(() => {
         if (isSuccess !== true) return;
 
@@ -25,34 +45,33 @@ function CreateShortNote() {
         return () => clearTimeout(timer);
     }, [isSuccess]);
 
-    const categoryLabels = {
-        "": "Select Category",
-        general: "General Interview",
-        interview: "Interview",
-        qbank: "Question Bank",
-        facebook: "Facebook",
-        instagram: "Instagram",
-        whatsapp: "WhatsApp",
-        others: "Others"
-    };
+    useEffect(() => {
+        return () => {
+            files.forEach(file => {
+                if (file.previewUrl) {
+                    URL.revokeObjectURL(file.previewUrl);
+                }
+            });
+        };
+    }, [files]);
 
     const handleInputValue = (e) => {
         const { name, value } = e.target;
 
-        setInputValue((prev) => ({
+        setInputValue(prev => ({
             ...prev,
             [name]: value
         }));
 
         if (formErrors[name]) {
-            setFormErrors((prev) => ({
+            setFormErrors(prev => ({
                 ...prev,
                 [name]: ""
             }));
         }
     };
 
-    // Ctrl+B shortcut for bold formatting
+    // Ctrl+B formatting
     const handleKeyDown = (e) => {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
             e.preventDefault();
@@ -61,7 +80,6 @@ function CreateShortNote() {
             const start = textarea.selectionStart;
             const end = textarea.selectionEnd;
             const currentValue = textarea.value;
-
             const selectedText = currentValue.substring(start, end);
 
             let newValue;
@@ -72,20 +90,16 @@ function CreateShortNote() {
                 selectedText.startsWith("**") &&
                 selectedText.endsWith("**")
             ) {
-                const unwrapped = selectedText.slice(2, -2);
-
                 newValue =
                     currentValue.substring(0, start) +
-                    unwrapped +
+                    selectedText.slice(2, -2) +
                     currentValue.substring(end);
 
                 newEnd = end - 4;
             } else {
-                const replacement = `**${selectedText}**`;
-
                 newValue =
                     currentValue.substring(0, start) +
-                    replacement +
+                    `**${selectedText}**` +
                     currentValue.substring(end);
 
                 if (selectedText.length === 0) {
@@ -96,33 +110,244 @@ function CreateShortNote() {
                 }
             }
 
-            setInputValue((prev) => ({
+            setInputValue(prev => ({
                 ...prev,
                 content: newValue
             }));
 
-            setTimeout(() => {
+            requestAnimationFrame(() => {
                 textarea.focus();
                 textarea.setSelectionRange(newStart, newEnd);
-            }, 0);
+            });
         }
     };
 
     const handleCategorySelect = (categoryKey) => {
-        setInputValue((prev) => ({
+        setInputValue(prev => ({
             ...prev,
             categoryId: categoryKey
         }));
 
-        if (formErrors.categoryId) {
-            setFormErrors((prev) => ({
-                ...prev,
-                categoryId: ""
+        setFormErrors(prev => ({
+            ...prev,
+            categoryId: ""
+        }));
+    };
+
+    // Add selected files or pasted images
+    const addFiles = (incomingFiles) => {
+        const validFiles = Array.from(incomingFiles || []);
+
+        if (!validFiles.length) return;
+
+        setFiles(previous => {
+            const remaining = MAX_FILES - previous.length;
+
+            if (remaining <= 0) {
+                setApiError("Maximum 5 attachments are allowed.");
+                return previous;
+            }
+
+            const accepted = validFiles.slice(0, remaining);
+
+            if (accepted.length < validFiles.length) {
+                setApiError("Maximum 5 attachments are allowed.");
+            } else {
+                setApiError("");
+            }
+
+            const newFiles = accepted.map(file => ({
+                file,
+                id: `${Date.now()}-${Math.random()}`,
+                previewUrl: file.type.startsWith("image/")
+                    ? URL.createObjectURL(file)
+                    : null
             }));
+
+            return [...previous, ...newFiles];
+        });
+    };
+
+    // File selection
+    const handleFileSelect = (e) => {
+        addFiles(e.target.files);
+        e.target.value = "";
+    };
+
+    // Paste images using Ctrl+V
+    const handlePaste = (e) => {
+        const items = e.clipboardData?.items;
+
+        if (!items) return;
+
+        const pastedImages = [];
+
+        for (const item of items) {
+            if (item.type.startsWith("image/")) {
+                const file = item.getAsFile();
+
+                if (file) {
+                    const extension =
+                        file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+
+                    const namedFile = new File(
+                        [file],
+                        `pasted-image-${Date.now()}.${extension}`,
+                        { type: file.type }
+                    );
+
+                    pastedImages.push(namedFile);
+                }
+            }
+        }
+
+        if (pastedImages.length > 0) {
+            e.preventDefault();
+            addFiles(pastedImages);
         }
     };
 
-    // Form validation
+    // Remove attachment
+    const removeFile = (id) => {
+        setFiles(previous => {
+            const selected = previous.find(item => item.id === id);
+
+            if (selected?.previewUrl) {
+                URL.revokeObjectURL(selected.previewUrl);
+            }
+
+            return previous.filter(item => item.id !== id);
+        });
+    };
+
+    // Parse API response
+    const readResponse = async (response) => {
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || data.success === false || data.status === false) {
+            throw new Error(
+                data.message || `Request failed (${response.status})`
+            );
+        }
+
+        return data;
+    };
+
+    // Extract generated note ID
+    const extractReferenceId = (response) => {
+        const data = response?.data;
+
+        return (
+            data?.noteId ||
+            data?.id ||
+            data?.referenceId ||
+            data?.shortNoteId ||
+            response?.noteId ||
+            response?.id ||
+            response?.referenceId ||
+            null
+        );
+    };
+
+    // Step 1: Create short note
+    const createShortNote = async () => {
+        const response = await fetch(
+            `${API_BASE_URL}/api/v1/short-note`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    userId: USER_ID
+                },
+                body: JSON.stringify(inputValue)
+            }
+        );
+
+        return await readResponse(response);
+    };
+
+    // Step 2: Generate DMS presigned URLs
+    const generatePresignedUrls = async (referenceId) => {
+        const params = new URLSearchParams();
+
+        files.forEach(item => {
+            params.append("fileName", item.file.name);
+        });
+
+        const response = await fetch(
+            `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(referenceId)}/dms/presigned?${params.toString()}`,
+            {
+                method: "GET",
+                headers: {
+                    userId: USER_ID
+                }
+            }
+        );
+
+        const result = await readResponse(response);
+
+        const urls = result.data;
+
+        if (!Array.isArray(urls) || urls.length !== files.length) {
+            throw new Error(
+                "DMS did not return the expected number of presigned URLs."
+            );
+        }
+
+        return urls;
+    };
+
+    // Step 3: Upload files directly to S3
+    const uploadFilesToS3 = async (urls) => {
+        for (let i = 0; i < files.length; i++) {
+            const item = files[i];
+            const file = item.file;
+
+            setUploadProgress(
+                `Uploading ${i + 1} of ${files.length}: ${file.name}`
+            );
+
+            const response = await fetch(urls[i], {
+                method: "PUT",
+                headers: {
+                    "Content-Type": file.type || "application/octet-stream"
+                },
+                body: file
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    `S3 upload failed for ${file.name} (${response.status})`
+                );
+            }
+        }
+    };
+
+    // Step 4: Save document metadata in DMS
+    const saveDocumentMetadata = async (referenceId) => {
+        const documentDtos = files.map(item => ({
+            fileName: item.file.name,
+            fileSize: item.file.size,
+            contentType: item.file.type || "application/octet-stream",
+            userId: USER_ID
+        }));
+
+        const response = await fetch(
+            `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(referenceId)}/dms`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    userId: USER_ID
+                },
+                body: JSON.stringify(documentDtos)
+            }
+        );
+
+        await readResponse(response);
+    };
+
+    // Validation
     const validate = () => {
         const errors = {};
 
@@ -138,48 +363,74 @@ function CreateShortNote() {
             errors.categoryId = "Please select a valid category";
         }
 
+        if (files.length > MAX_FILES) {
+            errors.files = "Maximum 5 attachments are allowed.";
+        }
+
         setFormErrors(errors);
 
         return Object.keys(errors).length === 0;
     };
 
-    // Save short note
+    // Submit note and attachments
     const handleSubmit = async (event) => {
         event.preventDefault();
 
-        // Prevent multiple submissions
         if (isLoading) return;
 
-        const isValid = validate();
-
-        if (!isValid) {
+        if (!validate()) {
             setIsSuccess(null);
+            return;
+        }
+
+        if (!API_BASE_URL) {
+            setApiError("VITE_API_BASE_URL is not configured.");
+            setIsSuccess(false);
+            return;
+        }
+
+        if (files.length > 0 && !DMS_API_BASE_URL) {
+            setApiError("VITE_DMS_API_BASE_URL is not configured.");
+            setIsSuccess(false);
             return;
         }
 
         setIsLoading(true);
         setIsSuccess(null);
         setApiError("");
+        setUploadProgress("");
+
+        let noteCreated = false;
 
         try {
-            const response = await fetch(
-                `${import.meta.env.VITE_API_BASE_URL}/api/v1/short-note`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        userId: "ankit0397"
-                    },
-                    body: JSON.stringify(inputValue)
+            // Create note first
+            setUploadProgress("Saving short note...");
+
+            const noteResponse = await createShortNote();
+            noteCreated = true;
+
+            // Attachments are optional
+            if (files.length > 0) {
+                const referenceId = extractReferenceId(noteResponse);
+
+                if (!referenceId) {
+                    throw new Error(
+                        "Note was saved, but its ID was not found in the API response. Please check your Short Note API response structure."
+                    );
                 }
-            );
 
-            const data = await response.json().catch(() => ({}));
+                // Generate URLs
+                setUploadProgress("Generating document upload URLs...");
 
-            if (!response.ok || data.success === false) {
-                throw new Error(
-                    data.message || `Request failed (${response.status})`
-                );
+                const urls = await generatePresignedUrls(referenceId);
+
+                // Upload to S3
+                await uploadFilesToS3(urls);
+
+                // Save metadata
+                setUploadProgress("Saving document information...");
+
+                await saveDocumentMetadata(referenceId);
             }
 
             setIsSuccess(true);
@@ -189,24 +440,33 @@ function CreateShortNote() {
                 title: "",
                 content: "",
                 categoryId: "others",
-                userId: "ankit0397"
+                userId: USER_ID
+            });
+
+            setFiles(previous => {
+                previous.forEach(item => {
+                    if (item.previewUrl) {
+                        URL.revokeObjectURL(item.previewUrl);
+                    }
+                });
+
+                return [];
             });
 
             setFormErrors({});
-
         } catch (error) {
-            console.error("Error saving short note:", error);
+            console.error("Short Note / DMS error:", error);
 
             setIsSuccess(false);
 
             setApiError(
-                error.message ||
-                "An error occurred while saving the note. Please try again."
+                noteCreated
+                    ? `Short Note was saved, but attachment processing failed: ${error.message}`
+                    : error.message || "Unable to save Short Note."
             );
-
         } finally {
-            // Enable button only after API response/error
             setIsLoading(false);
+            setUploadProgress("");
         }
     };
 
@@ -247,12 +507,41 @@ function CreateShortNote() {
                 .custom-submit-btn:disabled {
                     opacity: 0.7;
                     cursor: not-allowed;
-                    transform: none;
                 }
 
                 .form-control:focus {
                     border-color: #0d6efd;
                     box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+                }
+
+                .attachment-card {
+                    position: relative;
+                    border: 1px solid #dee2e6;
+                    border-radius: 10px;
+                    padding: 10px;
+                    background: #f8f9fa;
+                    min-width: 0;
+                }
+
+                .attachment-preview {
+                    width: 100%;
+                    height: 120px;
+                    object-fit: contain;
+                    border-radius: 6px;
+                    background: white;
+                }
+
+                .attachment-remove {
+                    position: absolute;
+                    top: 5px;
+                    right: 5px;
+                    border: none;
+                    background: #dc3545;
+                    color: white;
+                    width: 25px;
+                    height: 25px;
+                    border-radius: 50%;
+                    cursor: pointer;
                 }
             `}</style>
 
@@ -263,142 +552,40 @@ function CreateShortNote() {
                         Create Short Note
                     </h2>
 
-                    <form onSubmit={handleSubmit}>
+                    <form onSubmit={handleSubmit} onPaste={handlePaste}>
 
-                        {/* Category Selection */}
+                        {/* Category */}
                         <div className="mb-3">
                             <label className="form-label fw-semibold text-secondary small text-uppercase">
                                 Category
                             </label>
 
                             <div className="dropdown">
-                                <a
+                                <button
+                                    type="button"
                                     className="btn btn-outline-secondary custom-dropdown-btn dropdown-toggle d-flex justify-content-between align-items-center"
-                                    href="#"
-                                    role="button"
                                     data-bs-toggle="dropdown"
                                     data-bs-auto-close="outside"
-                                    aria-expanded="false"
-                                    style={{
-                                        width: "220px",
-                                        transition: "all 0.2s ease"
-                                    }}
+                                    style={{ width: "220px" }}
+                                    disabled={isLoading}
                                 >
-                                    <span>
-                                        {categoryLabels[inputValue.categoryId]}
-                                    </span>
-                                </a>
+                                    {categoryLabels[inputValue.categoryId]}
+                                </button>
 
                                 <ul className="dropdown-menu shadow border-0 py-2 rounded-3">
-                                    <li>
-                                        <a
-                                            className="dropdown-item py-2 px-3"
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleCategorySelect("general");
-                                            }}
-                                        >
-                                            General Interview
-                                        </a>
-                                    </li>
-
-                                    <li>
-                                        <a
-                                            className="dropdown-item py-2 px-3"
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleCategorySelect("interview");
-                                            }}
-                                        >
-                                            Common Interview Questions
-                                        </a>
-                                    </li>
-
-                                    <li>
-                                        <a
-                                            className="dropdown-item py-2 px-3"
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleCategorySelect("qbank");
-                                            }}
-                                        >
-                                            Question Bank
-                                        </a>
-                                    </li>
-
-                                    {/* Nested Social Media Menu */}
-                                    <li className="dropend">
-                                        <a
-                                            className="dropdown-item dropdown-toggle py-2 px-3"
-                                            href="#"
-                                            data-bs-toggle="dropdown"
-                                            data-bs-auto-close="outside"
-                                            aria-expanded="false"
-                                        >
-                                            Social Media
-                                        </a>
-
-                                        <ul className="dropdown-menu shadow border-0 py-2 rounded-3">
-                                            <li>
-                                                <a
+                                    {Object.entries(categoryLabels).map(
+                                        ([key, label]) => (
+                                            <li key={key}>
+                                                <button
+                                                    type="button"
                                                     className="dropdown-item py-2 px-3"
-                                                    href="#"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        handleCategorySelect("facebook");
-                                                    }}
+                                                    onClick={() => handleCategorySelect(key)}
                                                 >
-                                                    Facebook
-                                                </a>
+                                                    {label}
+                                                </button>
                                             </li>
-
-                                            <li>
-                                                <a
-                                                    className="dropdown-item py-2 px-3"
-                                                    href="#"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        handleCategorySelect("instagram");
-                                                    }}
-                                                >
-                                                    Instagram
-                                                </a>
-                                            </li>
-
-                                            <li>
-                                                <a
-                                                    className="dropdown-item py-2 px-3"
-                                                    href="#"
-                                                    onClick={(e) => {
-                                                        e.preventDefault();
-                                                        handleCategorySelect("whatsapp");
-                                                    }}
-                                                >
-                                                    WhatsApp
-                                                </a>
-                                            </li>
-                                        </ul>
-                                    </li>
-
-                                    <li>
-                                        <hr className="dropdown-divider my-1" />
-                                    </li>
-
-                                    <li>
-                                        <a
-                                            className="dropdown-item py-2 px-3 text-danger"
-                                            href="#"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                handleCategorySelect("others");
-                                            }}
-                                        >
-                                            Others
-                                        </a>
-                                    </li>
+                                        )
+                                    )}
                                 </ul>
                             </div>
 
@@ -409,12 +596,9 @@ function CreateShortNote() {
                             )}
                         </div>
 
-                        {/* Note Title */}
+                        {/* Note title */}
                         <div className="mb-3">
-                            <label
-                                htmlFor="exampleFormControlInput1"
-                                className="form-label fw-semibold text-secondary small text-uppercase"
-                            >
+                            <label className="form-label fw-semibold text-secondary small text-uppercase">
                                 Note Name
                             </label>
 
@@ -424,7 +608,6 @@ function CreateShortNote() {
                                 value={inputValue.title}
                                 onChange={handleInputValue}
                                 className="form-control py-2 shadow-none"
-                                id="exampleFormControlInput1"
                                 placeholder="Short Note Name"
                                 disabled={isLoading}
                             />
@@ -439,34 +622,25 @@ function CreateShortNote() {
                         {/* Description */}
                         <div className="mb-3">
                             <div className="d-flex justify-content-between align-items-center mb-1">
-                                <label
-                                    htmlFor="exampleFormControlTextarea1"
-                                    className="form-label fw-semibold text-secondary small text-uppercase mb-0"
-                                >
+                                <label className="form-label fw-semibold text-secondary small text-uppercase">
                                     Description
                                 </label>
 
-                                <small
-                                    className="text-muted"
-                                    style={{ fontSize: "12px" }}
-                                >
-                                    Tip: Select text & press{" "}
-                                    <kbd className="bg-light border px-1 rounded text-dark">
-                                        Ctrl + B
-                                    </kbd>{" "}
-                                    for bold
+                                <small className="text-muted">
+                                    Select text and press{" "}
+                                    <kbd>Ctrl + B</kbd> for bold
                                 </small>
                             </div>
 
                             <textarea
+                                ref={textareaRef}
                                 name="content"
                                 value={inputValue.content}
                                 className="form-control note-textarea shadow-none"
                                 onChange={handleInputValue}
                                 onKeyDown={handleKeyDown}
-                                id="exampleFormControlTextarea1"
                                 rows={10}
-                                placeholder="Description"
+                                placeholder="Description (you can also paste images using Ctrl + V)"
                                 disabled={isLoading}
                                 style={{
                                     fontFamily: "monospace",
@@ -481,15 +655,112 @@ function CreateShortNote() {
                             )}
                         </div>
 
-                        {/* API Error */}
-                        {isSuccess === false && (
-                            <div className="alert alert-danger mt-3 py-2" role="alert">
-                                {apiError ||
-                                    "An error occurred while saving the note. Please try again."}
+                        {/* Attachments */}
+                        <div className="mb-3">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <label className="form-label fw-semibold text-secondary small text-uppercase mb-0">
+                                    Document Attachments
+                                </label>
+
+                                <small className="text-muted">
+                                    {files.length}/{MAX_FILES} files
+                                </small>
+                            </div>
+
+                            <div className="border rounded-3 p-3 bg-light">
+                                <div className="d-flex flex-wrap align-items-center gap-2">
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-primary"
+                                        disabled={isLoading || files.length >= MAX_FILES}
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <i className="bi bi-paperclip me-2"></i>
+                                        Attach Files
+                                    </button>
+
+                                    <span className="small text-muted">
+                                        Or paste an image using Ctrl + V
+                                    </span>
+                                </div>
+
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    multiple
+                                    hidden
+                                    disabled={isLoading}
+                                    onChange={handleFileSelect}
+                                />
+
+                                <div className="small text-muted mt-2">
+                                    Maximum 5 files. Images and documents are supported.
+                                </div>
+
+                                {files.length > 0 && (
+                                    <div className="row g-2 mt-2">
+                                        {files.map(item => (
+                                            <div
+                                                className="col-6 col-md-4"
+                                                key={item.id}
+                                            >
+                                                <div className="attachment-card">
+                                                    <button
+                                                        type="button"
+                                                        className="attachment-remove"
+                                                        disabled={isLoading}
+                                                        onClick={() => removeFile(item.id)}
+                                                        aria-label="Remove attachment"
+                                                    >
+                                                        ×
+                                                    </button>
+
+                                                    {item.previewUrl ? (
+                                                        <img
+                                                            src={item.previewUrl}
+                                                            className="attachment-preview"
+                                                            alt={item.file.name}
+                                                        />
+                                                    ) : (
+                                                        <div className="attachment-preview d-flex align-items-center justify-content-center">
+                                                            <i className="bi bi-file-earmark-text fs-1 text-primary"></i>
+                                                        </div>
+                                                    )}
+
+                                                    <div
+                                                        className="small fw-semibold text-truncate mt-2"
+                                                        title={item.file.name}
+                                                    >
+                                                        {item.file.name}
+                                                    </div>
+
+                                                    <div className="small text-muted">
+                                                        {(item.file.size / 1024).toFixed(1)} KB
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Upload progress */}
+                        {uploadProgress && (
+                            <div className="alert alert-info mt-3 py-2">
+                                <span className="spinner-border spinner-border-sm me-2"></span>
+                                {uploadProgress}
                             </div>
                         )}
 
-                        {/* Submit Button */}
+                        {/* API error */}
+                        {isSuccess === false && (
+                            <div className="alert alert-danger mt-3 py-2" role="alert">
+                                {apiError || "An error occurred. Please try again."}
+                            </div>
+                        )}
+
+                        {/* Submit */}
                         <button
                             type="submit"
                             disabled={isLoading}
@@ -500,22 +771,21 @@ function CreateShortNote() {
                                     <span
                                         className="spinner-border spinner-border-sm me-2"
                                         role="status"
-                                        aria-hidden="true"
                                     ></span>
-                                    Saving...
+                                    Processing...
                                 </>
                             ) : (
                                 "Submit"
                             )}
                         </button>
 
-                        {/* Success Message */}
+                        {/* Success */}
                         {isSuccess === true && (
                             <div
                                 className="alert alert-success mt-3 py-2 text-center"
                                 role="alert"
                             >
-                                Note saved successfully!
+                                Note and attachments saved successfully!
                             </div>
                         )}
 
