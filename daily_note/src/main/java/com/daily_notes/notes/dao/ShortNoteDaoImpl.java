@@ -10,7 +10,6 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
-import java.security.Key;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
@@ -35,9 +34,9 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
     @Override
     public ShortNoteEntity findByHashToken(String userId, String uniqueToken) {
         DynamoDbIndex<ShortNoteEntity> index = table.index("UserUniqueTokenIndex");
-        QueryConditional condition = QueryConditional
-                .keyEqualTo(Key.builder().partitionValue(userId).sortValue(uniqueToken).build());
-        return index.query(r -> r.queryConditional(condition)).stream().flatMap(page -> page.items().stream())
+        QueryConditional condition = QueryConditional.keyEqualTo(Key.builder().partitionValue(userId).sortValue(uniqueToken).build());
+        return index.query(r -> r.queryConditional(condition)).stream().flatMap(page ->
+                        page.items().stream())
                 .findFirst()
                 .orElse(null);
     }
@@ -49,12 +48,9 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
     }
 
     @Override
-    public Page<ShortNoteEntity> getAllShortNotes(String userId, int limit,
-            Map<String, AttributeValue> lastEvaluatedKey) {
+    public Page<ShortNoteEntity> getAllShortNotes(String userId, int limit, Map<String, AttributeValue> lastEvaluatedKey) {
         DynamoDbIndex<ShortNoteEntity> index = table.index("shortnote_createdAt_index");
-        QueryEnhancedRequest.Builder requestBuilder = QueryEnhancedRequest.builder()
-                .queryConditional(QueryConditional.keyEqualTo(Key.builder().partitionValue(userId).build()))
-                .scanIndexForward(false).limit(limit);
+        QueryEnhancedRequest.Builder requestBuilder = QueryEnhancedRequest.builder().queryConditional(QueryConditional.keyEqualTo(Key.builder().partitionValue(userId).build())).scanIndexForward(false).limit(limit);
         if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
             requestBuilder.exclusiveStartKey(lastEvaluatedKey);
         }
@@ -74,7 +70,8 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
                 Key.builder()
                         .partitionValue(userId)
                         .sortValue(noteId)
-                        .build());
+                        .build()
+        );
         logger.info("Short note deleted successfully for Short Note Id : {}", entity.getId());
     }
 }
