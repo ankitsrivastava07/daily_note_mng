@@ -1,4 +1,3 @@
-
 name: Deploy Daily Note DMS to AWS Lambda
 
 on:
@@ -88,10 +87,22 @@ jobs:
           tags: |
             ${{ env.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/${{ env.ECR_REPOSITORY }}:latest
 
-      # 8. Update existing Lambda function
+      # 8. Verify ECR image
+      - name: Verify ECR image
+        run: |
+          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest"
+
+          echo "Verifying image: $IMAGE_URI"
+
+          aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag=latest \
+            --region "$AWS_REGION"
+
+      # 9. Update existing Lambda function
       - name: Update DMS Lambda
         run: |
-          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:${GITHUB_SHA}"
+          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}:latest"
 
           echo "Deploying image: $IMAGE_URI"
 
@@ -100,14 +111,14 @@ jobs:
             --image-uri "$IMAGE_URI" \
             --region "$AWS_REGION"
 
-      # 9. Wait for Lambda deployment
+      # 10. Wait for Lambda deployment
       - name: Wait for Lambda deployment
         run: |
           aws lambda wait function-updated-v2 \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --region "$AWS_REGION"
 
-      # 10. Verify Lambda deployment
+      # 11. Verify Lambda deployment
       - name: Verify Lambda deployment
         run: |
           aws lambda get-function-configuration \
@@ -135,7 +146,7 @@ jobs:
 
           echo "Lambda deployment successful!"
 
-      # 11. Deployment completed
+      # 12. Deployment completed
       - name: Deployment completed
         run: |
           echo "======================================"
