@@ -664,9 +664,7 @@ function CreateShortNote() {
                                     Description
                                 </label>
 
-                                <small className="text-muted">
-                                    Select text and press <kbd>Ctrl + B</kbd> for bold
-                                </small>
+                       
                             </div>
 
                             <textarea
