@@ -1,0 +1,43 @@
+.short-note-attachment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.short-note-attachment-card {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+.short-note-attachment-image {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: 200px;
+    object-fit: contain;
+    object-position: center;
+    border-radius: 8px;
+}
+
+.short-note-attachments {
+    width: 100%;
+    max-width: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+@media (max-width: 600px) {
+    .short-note-attachment-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .short-note-attachment-image {
+        height: 180px;
+    }
+}
