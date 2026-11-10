@@ -2,11 +2,14 @@ package com.daily_notes.notes.service;
 
 import com.daily_notes.notes.dao.ShortNoteDao;
 import com.daily_notes.notes.dto.CreateShortNoteDto;
+import com.daily_notes.notes.dto.ShortNoteDto;
 import com.daily_notes.notes.entity.ShortNoteEntity;
 import com.daily_notes.notes.exceptions.exception.ShortEntityAlreadyExistException;
 import com.daily_notes.notes.mapper.CustomMapper;
+import com.daily_notes.notes.proxy.DMSFeignClient;
 import com.daily_notes.notes.records.ApiResponse;
 import com.daily_notes.notes.utility.constant.TokenUtil;
+import feign.FeignException;
 import org.apache.kafka.shaded.com.google.protobuf.Api;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,6 +18,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.Map;
 
@@ -23,9 +27,11 @@ public class ShortNoteServiceImpl implements ShortNoteService {
 
     private final ShortNoteDao shortNoteDao;
     private final Logger logger = LoggerFactory.getLogger(ShortNoteServiceImpl.class);
+    private final DMSFeignClient dmsFeignClient;
 
-    public ShortNoteServiceImpl(ShortNoteDao shortNoteDao) {
+    public ShortNoteServiceImpl(ShortNoteDao shortNoteDao, DMSFeignClient dmsFeignClient) {
         this.shortNoteDao = shortNoteDao;
+        this.dmsFeignClient = dmsFeignClient;
     }
 
     @Override
@@ -79,8 +85,24 @@ public class ShortNoteServiceImpl implements ShortNoteService {
     @Override
     public ApiResponse getShortNoteById(String userId, String shortNoteId) {
 
+        logger.info("Fetching short note with shortNoteId: {}, userId: {}", shortNoteId, userId);
         ShortNoteEntity shortNote =
                 shortNoteDao.getShortNoteById(userId, shortNoteId);
+        ApiResponse apiResponse;
+        try {
+            logger.info("Retrieved short note: {}", shortNote);
+            apiResponse = dmsFeignClient
+                    .getAllDocumentsByShortNoteId(shortNoteId)
+                    .getBody();
+
+            logger.info("Retrieved short note: {}", apiResponse);
+        } catch (FeignException.BadGateway e) {
+            logger.error("Error while fetching documents for short note ID: {}", shortNoteId, e);
+            return new ApiResponse()
+                    .success(Boolean.FALSE)
+                    .message("We couldn't load the documents right now. Please try again shortly.")
+                    .error("Service temporarily unavailable");
+        }
 
         if (shortNote == null) {
             return new ApiResponse()
@@ -89,10 +111,16 @@ public class ShortNoteServiceImpl implements ShortNoteService {
                     .error("No record found for ID: " + shortNoteId);
         }
 
+        ShortNoteDto shortNoteDto = new ShortNoteDto();
+        shortNoteDto.setContent(shortNote.getContent());
+        shortNoteDto.setTitle(shortNote.getTitle());
+        shortNoteDto.setCreatedAt(shortNote.getCreatedAt());
+        shortNoteDto.setDownloadUrl((List<String>) apiResponse.data());
+
         return new ApiResponse()
                 .success(Boolean.TRUE)
                 .message("Short note fetched successfully")
-                .data(shortNote);
+                .data(shortNoteDto);
     }
 
     @Override
