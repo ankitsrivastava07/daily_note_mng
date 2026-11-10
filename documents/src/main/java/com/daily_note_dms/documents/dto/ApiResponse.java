@@ -1,3 +1,4 @@
+
 package com.daily_note_dms.documents.dto;
 
 import java.util.ArrayList;
@@ -8,12 +9,13 @@ public record ApiResponse(
         Object data,
         Object error
 ) {
-    // Zero-argument constructor providing defaults
+
     public ApiResponse() {
         this(null, null, new ArrayList<>(), new ArrayList<>());
     }
 
-    // Fluent "wither" methods returning a new copy with the updated field
+    // Fluent methods
+
     public ApiResponse message(String message) {
         return new ApiResponse(message, this.success, this.data, this.error);
     }
