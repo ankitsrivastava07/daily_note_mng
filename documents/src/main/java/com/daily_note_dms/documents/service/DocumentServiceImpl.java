@@ -10,13 +10,10 @@ import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.daily_note_dms.documents.utillity.DMSConstant.SUCCESS;
@@ -28,9 +25,6 @@ public class DocumentServiceImpl implements DocumentService {
     private final DmsFileService dmsFileService;
 
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
-
-    @Value("${aws.s3.bucket.name}")
-    private String S3_BUCKET_NAME;
 
     public DocumentServiceImpl(DocumentDao fileDao,
                                S3Service s3Service,

@@ -17,7 +17,7 @@ public class DmsFileService {
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
 
-    @Value("${aws.s3.bucket-name:daily-note-dms}")
+    @Value("${aws.s3.bucket-name:null}")
     private String bucketName;
 
     public DmsFileService(S3Client s3Client, S3Presigner s3Presigner) {
