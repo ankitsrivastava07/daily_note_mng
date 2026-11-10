@@ -36,6 +36,7 @@ function ShortNoteView() {
     const [error, setError] = useState("");
     const [attachmentError, setAttachmentError] = useState("");
     const [attachmentLoading, setAttachmentLoading] = useState(false);
+    const [openingAttachment, setOpeningAttachment] = useState<string | null>(null);
 
     // ==========================================
     // FETCH SHORT NOTE AND DMS ATTACHMENTS
@@ -108,11 +109,20 @@ function ShortNoteView() {
 
                 let attachments: Attachment[] = [];
 
+                // Show the note immediately after Note Service responds.
+                // Keep the attachment section in a loading state while DMS
+                // retrieves the presigned URLs.
+                setAttachmentLoading(true);
+                setShortNote({
+                    ...note,
+                    id: referenceId,
+                    downloadUrl: []
+                });
+                setLoading(false);
+
                 // ==========================================
                 // STEP 2: FETCH ALL FILES FROM DMS
                 // ==========================================
-
-                setAttachmentLoading(true);
 
                 try {
                     const dmsUrl =
@@ -323,6 +333,50 @@ function ShortNoteView() {
     };
 
     // ==========================================
+    // OPEN DOCUMENT ATTACHMENT
+    // ==========================================
+
+    const handleOpenDocument = (attachment: Attachment) => {
+        setOpeningAttachment(attachment.downloadUrl);
+
+        // Open synchronously from the click so the browser does not block it.
+        const documentWindow = window.open(
+            attachment.downloadUrl,
+            "_blank"
+        );
+
+        if (!documentWindow) {
+            setOpeningAttachment(null);
+            setAttachmentError(
+                "The document could not be opened. Please allow pop-ups and try again."
+            );
+            return;
+        }
+
+        // A cross-origin document does not expose its internal loading state.
+        // Clear the button spinner when the new tab finishes its initial load,
+        // with a fallback in case the browser does not dispatch a load event.
+        let spinnerCleared = false;
+        const clearSpinner = () => {
+            if (spinnerCleared) return;
+            spinnerCleared = true;
+            window.clearTimeout(fallbackTimer);
+            setOpeningAttachment((current) =>
+                current === attachment.downloadUrl ? null : current
+            );
+        };
+
+        const fallbackTimer = window.setTimeout(clearSpinner, 15000);
+
+        try {
+            documentWindow.addEventListener("load", clearSpinner, { once: true });
+        } catch {
+            // Some browsers restrict access to newly opened cross-origin tabs.
+            // The fallback timer above still clears the loading indicator.
+        }
+    };
+
+    // ==========================================
     // RENDER CLICKABLE URLS
     // ==========================================
 
@@ -415,7 +469,62 @@ function ShortNoteView() {
     // ==========================================
 
     return (
-        <main className="short-note-view-container">
+        <>
+            <style>{`
+                .short-note-document-open-button {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    border: 0;
+                    padding: 8px;
+                    background: transparent;
+                    font-size: 2.5rem;
+                    cursor: pointer;
+                }
+
+                .short-note-document-open-button:disabled {
+                    cursor: wait;
+                    opacity: 0.75;
+                }
+
+                .short-note-document-spinner {
+                    display: inline-block;
+                    width: 28px;
+                    height: 28px;
+                    border: 3px solid rgba(100, 116, 139, 0.25);
+                    border-top-color: currentColor;
+                    border-radius: 50%;
+                    animation: short-note-document-spin 0.75s linear infinite;
+                }
+
+                .short-note-attachment-loading {
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 8px;
+                    padding: 18px 0;
+                    color: #64748b;
+                    text-align: center;
+                }
+
+                .short-note-dms-loading-gif {
+                    display: block;
+                    width: 150px;
+                    height: 115px;
+                    max-width: 100%;
+                    object-fit: contain;
+                }
+
+                .short-note-attachment-loading p {
+                    margin: 0;
+                }
+
+                @keyframes short-note-document-spin {
+                    to { transform: rotate(360deg); }
+                }
+            `}</style>
+            <main className="short-note-view-container">
 
             {/* Top navigation */}
 
@@ -492,16 +601,30 @@ function ShortNoteView() {
 
                 {/* DMS attachments */}
 
-                {shortNote.downloadUrl.length > 0 && (
+                {(attachmentLoading || shortNote.downloadUrl.length > 0) && (
                     <>
                         <div className="short-note-detail-divider" />
 
                         <section className="short-note-attachments">
 
                             <h3 className="short-note-section-title">
-                                Attachments ({shortNote.downloadUrl.length})
+                                {attachmentLoading
+                                    ? "Attachments"
+                                    : `Attachments (${shortNote.downloadUrl.length})`}
                             </h3>
 
+                            {attachmentLoading && (
+                                <div className="short-note-attachment-loading">
+                                    <img
+                                        src="/professional-dms-loader.gif"
+                                        alt="Loading attachments from DMS"
+                                        className="short-note-dms-loading-gif"
+                                    />
+                                    <p>Retrieving attachments ...</p>
+                                </div>
+                            )}
+
+                            {!attachmentLoading && (
                             <div className="short-note-attachment-grid">
 
                                 {shortNote.downloadUrl.map(
@@ -532,7 +655,23 @@ function ShortNoteView() {
                                                     </a>
                                                 ) : (
                                                     <div className="short-note-file-icon">
-                                                        📄
+                                                        <button
+                                                            type="button"
+                                                            className="short-note-document-open-button"
+                                                            onClick={() => handleOpenDocument(attachment)}
+                                                            disabled={openingAttachment === attachment.downloadUrl}
+                                                            aria-label={`Open ${fileName}`}
+                                                            title={`Open ${fileName}`}
+                                                        >
+                                                            {openingAttachment === attachment.downloadUrl ? (
+                                                                <span
+                                                                    className="short-note-document-spinner"
+                                                                    aria-label="Opening document"
+                                                                />
+                                                            ) : (
+                                                                "📄"
+                                                            )}
+                                                        </button>
                                                     </div>
                                                 )}
 
@@ -551,16 +690,10 @@ function ShortNoteView() {
                                 )}
 
                             </div>
+                            )}
 
                         </section>
                     </>
-                )}
-
-                {attachmentLoading && (
-                    <div className="short-note-state">
-                        <span className="short-note-spinner" />
-                        <p>Retrieving attachments...</p>
-                    </div>
                 )}
 
                 {attachmentError && (
@@ -612,7 +745,8 @@ function ShortNoteView() {
                 </section>
 
             </article>
-        </main>
+            </main>
+        </>
     );
 }
 
