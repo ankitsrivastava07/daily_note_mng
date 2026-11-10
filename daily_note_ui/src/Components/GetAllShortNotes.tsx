@@ -465,11 +465,11 @@ function GetAllShortNotes() {
                                 }
                             >
                                 <option value="newest">
-                                    Newest first
+                                    Sort By DESC
                                 </option>
 
                                 <option value="oldest">
-                                    Oldest first
+                                    Sort By ASC
                                 </option>
                             </select>
                         </label>
