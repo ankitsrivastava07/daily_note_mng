@@ -364,3 +364,60 @@
         text-decoration: none !important;
     }
 }
+
+
+.short-note-attachment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 20px;
+    width: 100%;
+}
+
+.short-note-attachment-card {
+    min-width: 0;
+    width: 100%;
+    overflow: visible;
+}
+
+.short-note-image-link {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+}
+
+.short-note-attachment-image {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 400px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.short-note-attachment-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    width: 100%;
+    min-width: 0;
+    overflow: visible;
+}
+
+.short-note-attachment-name {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+    text-overflow: clip;
+    line-height: 1.5;
+}
+
+.short-note-attachment-info a {
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
