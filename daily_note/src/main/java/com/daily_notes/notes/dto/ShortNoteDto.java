@@ -6,6 +6,15 @@ import java.util.List;
 public class ShortNoteDto {
 
     private String name;
+    private String path;
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
+    }
 
     public Instant getCreatedAt() {
         return createdAt;

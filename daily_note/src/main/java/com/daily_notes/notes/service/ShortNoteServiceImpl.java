@@ -13,6 +13,7 @@ import feign.FeignException;
 import org.apache.kafka.shaded.com.google.protobuf.Api;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
@@ -27,11 +28,11 @@ public class ShortNoteServiceImpl implements ShortNoteService {
 
     private final ShortNoteDao shortNoteDao;
     private final Logger logger = LoggerFactory.getLogger(ShortNoteServiceImpl.class);
-    private final DMSFeignClient dmsFeignClient;
+    @Value("${aws.s3.bucket-name}")
+    private String bucketName;
 
-    public ShortNoteServiceImpl(ShortNoteDao shortNoteDao, DMSFeignClient dmsFeignClient) {
+    public ShortNoteServiceImpl(ShortNoteDao shortNoteDao) {
         this.shortNoteDao = shortNoteDao;
-        this.dmsFeignClient = dmsFeignClient;
     }
 
     @Override
@@ -65,7 +66,6 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         }
 
         entity.setUniqueToken(token);
-
         // Log exact information needed for future recovery
         logger.info(
                 "SHORT_NOTE_CREATED userId={} noteId={} createdAt={}",
@@ -89,7 +89,7 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         ShortNoteEntity shortNote =
                 shortNoteDao.getShortNoteById(userId, shortNoteId);
         ApiResponse apiResponse;
-        try {
+       /* try {
             logger.info("Retrieved short note: {}", shortNote);
             apiResponse = dmsFeignClient
                     .getAllDocumentsByShortNoteId(shortNoteId)
@@ -102,7 +102,7 @@ public class ShortNoteServiceImpl implements ShortNoteService {
                     .success(Boolean.FALSE)
                     .message("We couldn't load the documents right now. Please try again shortly.")
                     .error("Service temporarily unavailable");
-        }
+        }*/
 
         if (shortNote == null) {
             return new ApiResponse()
@@ -112,10 +112,11 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         }
 
         ShortNoteDto shortNoteDto = new ShortNoteDto();
+        shortNoteDto.setPath(bucketName + "/" + shortNote.getId());
         shortNoteDto.setContent(shortNote.getContent());
         shortNoteDto.setTitle(shortNote.getTitle());
         shortNoteDto.setCreatedAt(shortNote.getCreatedAt());
-        shortNoteDto.setDownloadUrl((List<String>) apiResponse.data());
+        //shortNoteDto.setDownloadUrl((List<String>) apiResponse.data());
 
         return new ApiResponse()
                 .success(Boolean.TRUE)
