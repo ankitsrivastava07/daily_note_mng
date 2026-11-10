@@ -3,19 +3,20 @@ package com.daily_note_dms.documents.service;
 import com.daily_note_dms.documents.dao.DocumentDao;
 import com.daily_note_dms.documents.dto.ApiResponse;
 import com.daily_note_dms.documents.dto.CreatePresignedUrlRequest;
+import com.daily_note_dms.documents.dto.DmsFileResponse;
 import com.daily_note_dms.documents.dto.DocumentDto;
 import com.daily_note_dms.documents.entity.DocumentEntity;
 import io.github.resilience4j.bulkhead.BulkheadFullException;
 import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 import java.time.LocalDate;
-import java.util.Date;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.daily_note_dms.documents.utillity.DMSConstant.SUCCESS;
@@ -24,11 +25,19 @@ import static com.daily_note_dms.documents.utillity.DMSConstant.SUCCESS;
 public class DocumentServiceImpl implements DocumentService {
     private final DocumentDao documentDao;
     private final S3Service s3Service;
+    private final DmsFileService dmsFileService;
+
     private final Logger logger = LoggerFactory.getLogger(this.getClass());
 
-    public DocumentServiceImpl(DocumentDao fileDao, S3Service s3Service) {
+    @Value("${aws.s3.bucket.name}")
+    private String S3_BUCKET_NAME;
+
+    public DocumentServiceImpl(DocumentDao fileDao,
+                               S3Service s3Service,
+                               DmsFileService dmsFileService) {
         this.documentDao = fileDao;
         this.s3Service = s3Service;
+        this.dmsFileService = dmsFileService;
     }
 
     @Override
@@ -48,7 +57,7 @@ public class DocumentServiceImpl implements DocumentService {
             fileEntity.setContentType(e.getContentType());
             fileEntity.setCreatedAt(LocalDate.now());
             fileEntity.setUserId(e.getUserId());
-            fileEntity.setId(String.valueOf(System.nanoTime()+1));
+            fileEntity.setId(String.valueOf(System.nanoTime() + 1));
             return fileEntity;
         }).collect(Collectors.toList());
 
@@ -62,13 +71,6 @@ public class DocumentServiceImpl implements DocumentService {
     public ApiResponse createDocumentUploadPresignedURLFallback(String noteId, BulkheadFullException exp) {
         logger.info("createFileUploadPresignedURLFallback has called {}", exp.getLocalizedMessage());
         return new ApiResponse().status(Boolean.FALSE).message("Something Went Wrong");
-    }
-
-    @Override
-    public ApiResponse getAllDocumentByNoteId(String referenceId) {
-        return new ApiResponse().data(documentDao.getDocumentByReferenceId(referenceId))
-                .message(SUCCESS)
-                .status(Boolean.TRUE);
     }
 
     @Override
@@ -95,6 +97,20 @@ public class DocumentServiceImpl implements DocumentService {
                 .data(presignedURL)
                 .status(Boolean.TRUE)
                 .message(SUCCESS);
+    }
+
+    @Override
+    public ApiResponse getAllDocumentByNoteId(String noteId) {
+        List<DmsFileResponse> response = dmsFileService.getAllFiles(noteId);
+
+        return new ApiResponse(
+                "Documents fetched successfully",
+                true,
+                response.stream()
+                        .map(DmsFileResponse::downloadUrl)
+                        .collect(Collectors.toList()),
+                null
+        );
     }
 
 }

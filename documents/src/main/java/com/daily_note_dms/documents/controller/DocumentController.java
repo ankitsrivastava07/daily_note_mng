@@ -33,11 +33,11 @@ public class DocumentController {
         return null;
     }*/
 
-   /* @GetMapping
+    @GetMapping
     public ResponseEntity<?> getAllDocumentsByNoteId(@PathVariable String referenceId) {
         return new ResponseEntity<>(documentService.getAllDocumentByNoteId(referenceId),
                 HttpStatus.OK);
-    }*/
+    }
 
     @GetMapping("/presigned")
     public ResponseEntity<?> createPresignedURL(@PathVariable String referenceId,
