@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 
@@ -35,7 +34,7 @@ function ShortNoteView() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [attachmentError, setAttachmentError] = useState("");
-    const [attachmentLoading, setAttachmentLoading] = useState(false);
+    const [attachmentLoading, setAttachmentLoading] = useState(true);
     const [openingAttachment, setOpeningAttachment] = useState<string | null>(null);
 
     // ==========================================
@@ -48,9 +47,9 @@ function ShortNoteView() {
         const fetchShortNote = async () => {
             try {
                 setLoading(true);
+                setAttachmentLoading(true);
                 setError("");
                 setAttachmentError("");
-                setAttachmentLoading(false);
                 setShortNote(null);
 
                 if (!API_BASE_URL) {
@@ -100,19 +99,9 @@ function ShortNoteView() {
                 }
 
                 const note = noteResult.data;
-
-                // Use the ID returned by Note Service.
                 const referenceId = note.id || id;
 
-                console.log("Note fetched:", note);
-                console.log("DMS reference ID:", referenceId);
-
-                let attachments: Attachment[] = [];
-
-                // Show the note immediately after Note Service responds.
-                // Keep the attachment section in a loading state while DMS
-                // retrieves the presigned URLs.
-                setAttachmentLoading(true);
+                // Display the note content immediately
                 setShortNote({
                     ...note,
                     id: referenceId,
@@ -121,14 +110,19 @@ function ShortNoteView() {
                 setLoading(false);
 
                 // ==========================================
-                // STEP 2: FETCH ALL FILES FROM DMS
+                // STEP 2: FETCH ALL FILES FROM DMS WITH 5S DELAY
                 // ==========================================
 
                 try {
+                    // Create a minimum 5-second timer for the attachment loading state
+                    const minTimerPromise = new Promise((resolve) =>
+                        setTimeout(resolve, 5000)
+                    );
+
                     const dmsUrl =
                         `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(referenceId)}/dms`;
 
-                    const dmsResponse = await fetch(dmsUrl, {
+                    const dmsPromise = fetch(dmsUrl, {
                         method: "GET",
                         headers: {
                             userid: userId,
@@ -136,6 +130,11 @@ function ShortNoteView() {
                         },
                         signal: controller.signal
                     });
+
+                    const [dmsResponse] = await Promise.all([
+                        dmsPromise,
+                        minTimerPromise
+                    ]);
 
                     if (!dmsResponse.ok) {
                         throw new Error(
@@ -145,8 +144,6 @@ function ShortNoteView() {
                     }
 
                     const dmsResult = await dmsResponse.json();
-
-                    console.log("DMS response:", dmsResult);
 
                     if (dmsResult.success === false) {
                         throw new Error(
@@ -160,11 +157,7 @@ function ShortNoteView() {
                             ? dmsResult.data.files
                             : [];
 
-                    // ==========================================
-                    // STEP 3: EXTRACT ORIGINAL FILE NAMES
-                    // ==========================================
-
-                    attachments = files
+                    const attachments: Attachment[] = files
                         .map((file: any, index: number) => {
                             const downloadUrl =
                                 typeof file === "string"
@@ -180,7 +173,6 @@ function ShortNoteView() {
                                 return null;
                             }
 
-                            // Preserve original filename from S3 URL.
                             let fileName =
                                 typeof file === "object"
                                     ? file.fileName ||
@@ -211,7 +203,11 @@ function ShortNoteView() {
                                 file !== null
                         );
 
-                    console.log("Attachments loaded:", attachments);
+                    if (!controller.signal.aborted) {
+                        setShortNote((prev) =>
+                            prev ? { ...prev, downloadUrl: attachments } : null
+                        );
+                    }
 
                 } catch (dmsError: any) {
                     if (dmsError.name === "AbortError") {
@@ -220,29 +216,17 @@ function ShortNoteView() {
 
                     console.error("DMS error:", dmsError);
 
-                    setAttachmentError(
-                        dmsError.message ||
-                        "Unable to retrieve attachments."
-                    );
+                    if (!controller.signal.aborted) {
+                        setAttachmentError(
+                            dmsError.message ||
+                            "Unable to retrieve attachments."
+                        );
+                    }
                 } finally {
                     if (!controller.signal.aborted) {
                         setAttachmentLoading(false);
                     }
                 }
-
-                if (controller.signal.aborted) {
-                    return;
-                }
-
-                // ==========================================
-                // STEP 4: UPDATE NOTE
-                // ==========================================
-
-                setShortNote({
-                    ...note,
-                    id: referenceId,
-                    downloadUrl: attachments
-                });
 
             } catch (err: any) {
                 if (err.name !== "AbortError") {
@@ -254,6 +238,7 @@ function ShortNoteView() {
             } finally {
                 if (!controller.signal.aborted) {
                     setLoading(false);
+                    setAttachmentLoading(false);
                 }
             }
         };
@@ -277,11 +262,7 @@ function ShortNoteView() {
                 return `Attachment ${index + 1}`;
             }
 
-            // Decode the original S3 object filename.
             let fileName = decodeURIComponent(encodedName);
-
-            // Remove S3 object-key prefix if present.
-            // Example: UUID_pasted-image.png
             const uuidPrefix =
                 /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}_/i;
 
@@ -339,7 +320,6 @@ function ShortNoteView() {
     const handleOpenDocument = (attachment: Attachment) => {
         setOpeningAttachment(attachment.downloadUrl);
 
-        // Open synchronously from the click so the browser does not block it.
         const documentWindow = window.open(
             attachment.downloadUrl,
             "_blank"
@@ -353,9 +333,6 @@ function ShortNoteView() {
             return;
         }
 
-        // A cross-origin document does not expose its internal loading state.
-        // Clear the button spinner when the new tab finishes its initial load,
-        // with a fallback in case the browser does not dispatch a load event.
         let spinnerCleared = false;
         const clearSpinner = () => {
             if (spinnerCleared) return;
@@ -371,8 +348,7 @@ function ShortNoteView() {
         try {
             documentWindow.addEventListener("load", clearSpinner, { once: true });
         } catch {
-            // Some browsers restrict access to newly opened cross-origin tabs.
-            // The fallback timer above still clears the loading indicator.
+            // Fallback timer handles cleanup
         }
     };
 
@@ -410,7 +386,7 @@ function ShortNoteView() {
     };
 
     // ==========================================
-    // LOADING STATE
+    // LOADING STATE (Note itself loads normally)
     // ==========================================
 
     if (loading) {
@@ -419,7 +395,6 @@ function ShortNoteView() {
                 <div className="short-note-state">
                     <span className="short-note-spinner" />
                     <h3>Loading short note...</h3>
-                    <p>Please wait while we fetch your note.</p>
                 </div>
             </main>
         );
@@ -463,10 +438,6 @@ function ShortNoteView() {
     const contentLines = (shortNote.content || "")
         .split(/\r?\n/)
         .filter((line: string) => line.trim() !== "");
-
-    // ==========================================
-    // MAIN UI - ORIGINAL STRUCTURE PRESERVED
-    // ==========================================
 
     return (
         <>
@@ -526,225 +497,214 @@ function ShortNoteView() {
             `}</style>
             <main className="short-note-view-container">
 
-            {/* Top navigation */}
-
-            <div className="short-note-view-topbar">
-                <Link
-                    to="/get-all-short-notes"
-                    className="short-note-back-button"
-                >
-                    ← Back to Short Notes
-                </Link>
-
-                <div className="short-note-view-actions">
+                <div className="short-note-view-topbar">
                     <Link
-                        to={`/short-note/${shortNote.id}/edit`}
-                        className="short-note-edit-button"
+                        to="/get-all-short-notes"
+                        className="short-note-back-button"
                     >
-                        ✎ Edit Note
+                        ← Back to Short Notes
                     </Link>
+
+                    <div className="short-note-view-actions">
+                        <Link
+                            to={`/short-note/${shortNote.id}/edit`}
+                            className="short-note-edit-button"
+                        >
+                            ✎ Edit Note
+                        </Link>
+                    </div>
                 </div>
-            </div>
 
-            {/* Main note card */}
+                <article className="short-note-detail-card">
 
-            <article className="short-note-detail-card">
+                    <div className="short-note-detail-header">
 
-                {/* Note header */}
+                        <div className="short-note-detail-meta">
+                            <span className="short-note-category-badge">
+                                {shortNote.categoryId || "Uncategorized"}
+                            </span>
 
-                <div className="short-note-detail-header">
+                            <span className="short-note-type">
+                                SHORT NOTE
+                            </span>
+                        </div>
 
-                    <div className="short-note-detail-meta">
-                        <span className="short-note-category-badge">
-                            {shortNote.categoryId || "Uncategorized"}
-                        </span>
+                        <h1 className="short-note-detail-title">
+                            {shortNote.title || "Untitled Note"}
+                        </h1>
 
-                        <span className="short-note-type">
-                            SHORT NOTE
-                        </span>
+                        <p className="short-note-detail-subtitle">
+                            Your saved note and information
+                        </p>
+
                     </div>
 
-                    <h1 className="short-note-detail-title">
-                        {shortNote.title || "Untitled Note"}
-                    </h1>
+                    <div className="short-note-detail-divider" />
 
-                    <p className="short-note-detail-subtitle">
-                        Your saved note and information
-                    </p>
+                    <section className="short-note-detail-body">
 
-                </div>
+                        <h3 className="short-note-section-title">
+                            Note Content
+                        </h3>
 
-                <div className="short-note-detail-divider" />
+                        {contentLines.length > 0 ? (
+                            <div className="short-note-formatted-content">
+                                {contentLines.map(
+                                    (line: string, index: number) =>
+                                        renderContentLine(line, index)
+                                )}
+                            </div>
+                        ) : (
+                            <p className="short-note-no-content">
+                                No content available.
+                            </p>
+                        )}
 
-                {/* Note content */}
+                    </section>
 
-                <section className="short-note-detail-body">
+                    {/* DMS attachments section with 5-second minimum loading spinner */}
+                    {(attachmentLoading || shortNote.downloadUrl.length > 0) && (
+                        <>
+                            <div className="short-note-detail-divider" />
 
-                    <h3 className="short-note-section-title">
-                        Note Content
-                    </h3>
+                            <section className="short-note-attachments">
 
-                    {contentLines.length > 0 ? (
-                        <div className="short-note-formatted-content">
-                            {contentLines.map(
-                                (line: string, index: number) =>
-                                    renderContentLine(line, index)
-                            )}
-                        </div>
-                    ) : (
-                        <p className="short-note-no-content">
-                            No content available.
-                        </p>
-                    )}
+                                <h3 className="short-note-section-title">
+                                    {attachmentLoading
+                                        ? "Attachments"
+                                        : `Attachments (${shortNote.downloadUrl.length})`}
+                                </h3>
 
-                </section>
-
-                {/* DMS attachments */}
-
-                {(attachmentLoading || shortNote.downloadUrl.length > 0) && (
-                    <>
-                        <div className="short-note-detail-divider" />
-
-                        <section className="short-note-attachments">
-
-                            <h3 className="short-note-section-title">
-                                {attachmentLoading
-                                    ? "Attachments"
-                                    : `Attachments (${shortNote.downloadUrl.length})`}
-                            </h3>
-
-                            {attachmentLoading && (
-                                <div className="short-note-attachment-loading">
-                                    <img
-                                        src="/professional-dms-loader.gif"
-                                        alt="Loading attachments from DMS"
-                                        className="short-note-dms-loading-gif"
-                                    />
-                                    <p>Retrieving attachments ...</p>
-                                </div>
-                            )}
-
-                            {!attachmentLoading && (
-                            <div className="short-note-attachment-grid">
-
-                                {shortNote.downloadUrl.map(
-                                    (attachment, index) => {
-
-                                        const fileName = attachment.fileName;
-                                        const image = isImage(attachment);
-
-                                        return (
-                                            <div
-                                                className="short-note-attachment-card"
-                                                key={`${attachment.downloadUrl}-${index}`}
-                                            >
-
-                                                {image ? (
-                                                    <a
-                                                        href={attachment.downloadUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="short-note-image-link"
-                                                    >
-                                                        <img
-                                                            src={attachment.downloadUrl}
-                                                            alt={fileName}
-                                                            className="short-note-attachment-image"
-                                                            loading="lazy"
-                                                        />
-                                                    </a>
-                                                ) : (
-                                                    <div className="short-note-file-icon">
-                                                        <button
-                                                            type="button"
-                                                            className="short-note-document-open-button"
-                                                            onClick={() => handleOpenDocument(attachment)}
-                                                            disabled={openingAttachment === attachment.downloadUrl}
-                                                            aria-label={`Open ${fileName}`}
-                                                            title={`Open ${fileName}`}
-                                                        >
-                                                            {openingAttachment === attachment.downloadUrl ? (
-                                                                <span
-                                                                    className="short-note-document-spinner"
-                                                                    aria-label="Opening document"
-                                                                />
-                                                            ) : (
-                                                                "📄"
-                                                            )}
-                                                        </button>
-                                                    </div>
-                                                )}
-
-                                                <div className="short-note-attachment-info">
-                                                    <span
-                                                        className="short-note-attachment-name"
-                                                        title={fileName}
-                                                    >
-                                                        {fileName}
-                                                    </span>
-                                                </div>
-
-                                            </div>
-                                        );
-                                    }
+                                {attachmentLoading && (
+                                    <div className="short-note-attachment-loading">
+                                        <img
+                                            src="/professional-dms-loader.gif"
+                                            alt="Loading attachments"
+                                            className="short-note-dms-loading-gif"
+                                        />
+                                        <p>Retrieving attachments from DMS (5s lookup)...</p>
+                                    </div>
                                 )}
 
-                            </div>
-                            )}
+                                {!attachmentLoading && (
+                                    <div className="short-note-attachment-grid">
 
-                        </section>
-                    </>
-                )}
+                                        {shortNote.downloadUrl.map(
+                                            (attachment, index) => {
 
-                {attachmentError && (
-                    <div className="short-note-error-card">
-                        <p>
-                            Unable to retrieve attachments: {attachmentError}
-                        </p>
-                    </div>
-                )}
+                                                const fileName = attachment.fileName;
+                                                const image = isImage(attachment);
 
-                <div className="short-note-detail-divider" />
+                                                return (
+                                                    <div
+                                                        className="short-note-attachment-card"
+                                                        key={`${attachment.downloadUrl}-${index}`}
+                                                    >
 
-                {/* Footer metadata */}
+                                                        {image ? (
+                                                            <a
+                                                                href={attachment.downloadUrl}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="short-note-image-link"
+                                                            >
+                                                                <img
+                                                                    src={attachment.downloadUrl}
+                                                                    alt={fileName}
+                                                                    className="short-note-attachment-image"
+                                                                    loading="lazy"
+                                                                />
+                                                            </a>
+                                                        ) : (
+                                                            <div className="short-note-file-icon">
+                                                                <button
+                                                                    type="button"
+                                                                    className="short-note-document-open-button"
+                                                                    onClick={() => handleOpenDocument(attachment)}
+                                                                    disabled={openingAttachment === attachment.downloadUrl}
+                                                                    aria-label={`Open ${fileName}`}
+                                                                    title={`Open ${fileName}`}
+                                                                >
+                                                                    {openingAttachment === attachment.downloadUrl ? (
+                                                                        <span
+                                                                            className="short-note-document-spinner"
+                                                                            aria-label="Opening document"
+                                                                        />
+                                                                    ) : (
+                                                                        "📄"
+                                                                    )}
+                                                                </button>
+                                                            </div>
+                                                        )}
 
-                <section className="short-note-detail-footer">
+                                                        <div className="short-note-attachment-info">
+                                                            <span
+                                                                className="short-note-attachment-name"
+                                                                title={fileName}
+                                                            >
+                                                                {fileName}
+                                                            </span>
+                                                        </div>
 
-                    <div className="short-note-info-item">
-                        <span className="short-note-info-label">
-                            Short ID
-                        </span>
+                                                    </div>
+                                                );
+                                            }
+                                        )}
 
-                        <span className="short-note-info-value note-id">
-                            {shortNote.id}
-                        </span>
-                    </div>
+                                    </div>
+                                )}
 
-                    <div className="short-note-info-item">
-                        <span className="short-note-info-label">
-                            Created At
-                        </span>
+                            </section>
+                        </>
+                    )}
 
-                        <span className="short-note-info-value">
-                            {formatDate(shortNote.createdAt)}
-                        </span>
-                    </div>
+                    {attachmentError && (
+                        <div className="short-note-error-card">
+                            <p>
+                                Unable to retrieve attachments: {attachmentError}
+                            </p>
+                        </div>
+                    )}
 
-                    {shortNote.updatedAt && (
+                    <div className="short-note-detail-divider" />
+
+                    <section className="short-note-detail-footer">
+
                         <div className="short-note-info-item">
                             <span className="short-note-info-label">
-                                Updated At
+                                Short ID
+                            </span>
+
+                            <span className="short-note-info-value note-id">
+                                {shortNote.id}
+                            </span>
+                        </div>
+
+                        <div className="short-note-info-item">
+                            <span className="short-note-info-label">
+                                Created At
                             </span>
 
                             <span className="short-note-info-value">
-                                {formatDate(shortNote.updatedAt)}
+                                {formatDate(shortNote.createdAt)}
                             </span>
                         </div>
-                    )}
 
-                </section>
+                        {shortNote.updatedAt && (
+                            <div className="short-note-info-item">
+                                <span className="short-note-info-label">
+                                    Updated At
+                                </span>
 
-            </article>
+                                <span className="short-note-info-value">
+                                    {formatDate(shortNote.updatedAt)}
+                                </span>
+                            </div>
+                        )}
+
+                    </section>
+
+                </article>
             </main>
         </>
     );
