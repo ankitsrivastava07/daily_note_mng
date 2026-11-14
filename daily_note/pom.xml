@@ -121,13 +121,13 @@
             <artifactId>spring-cloud-starter-circuitbreaker-resilience4j</artifactId>
         </dependency>
 
-        <!-- Bucket4j Rate Limiting -->
-        <dependency>
-            <groupId>com.bucket4j</groupId>
-            <artifactId>bucket4j-caffeine</artifactId>
-            <version>${bucket4j.version}</version>
-        </dependency>
-
+        <!-- &lt;!&ndash; Bucket4j Rate Limiting &ndash;&gt;
+         <dependency>
+             <groupId>com.bucket4j</groupId>
+             <artifactId>bucket4j-caffeine</artifactId>
+             <version>${bucket4j.version}</version>
+         </dependency>
+ -->
         <!--  &lt;!&ndash; Caffeine Cache &ndash;&gt;
           <dependency>
               <groupId>com.github.ben-manes.caffeine</groupId>
