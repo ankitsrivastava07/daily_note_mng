@@ -582,7 +582,7 @@ function ShortNoteView() {
                                             alt="Loading attachments"
                                             className="short-note-dms-loading-gif"
                                         />
-                                        <p>Retrieving attachments from DMS (5s lookup)...</p>
+                                        <p>Retrieving attachments</p>
                                     </div>
                                 )}
 
