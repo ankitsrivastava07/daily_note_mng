@@ -1,9 +1,14 @@
+
 name: Deploy Daily Note DMS to AWS Lambda
 
 on:
   push:
     branches:
       - main
+    paths:
+      - "documents/**"
+      - ".github/workflows/deploy-dms.yml"
+
   workflow_dispatch:
 
 permissions:
@@ -146,9 +151,65 @@ jobs:
 
           echo "Lambda deployment successful!"
 
-      # 12. Deployment completed
+      # 12. Cleanup old ECR images - Keep only latest
+      - name: Cleanup old ECR images
+        run: |
+          set -e
+
+          echo "Getting current latest image digest..."
+
+          CURRENT_DIGEST=$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag=latest \
+            --region "$AWS_REGION" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)
+
+          if [ -z "$CURRENT_DIGEST" ] || [ "$CURRENT_DIGEST" = "None" ]; then
+            echo "ERROR: Could not identify latest image."
+            exit 1
+          fi
+
+          echo "Keeping image digest: $CURRENT_DIGEST"
+
+          OLD_IMAGES=$(aws ecr list-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --region "$AWS_REGION" \
+            --filter tagStatus=ANY \
+            --output json | jq -c \
+            --arg digest "$CURRENT_DIGEST" \
+            '[.imageIds[]
+              | select(.imageDigest != $digest)
+              | {imageDigest: .imageDigest}]
+              | unique_by(.imageDigest)')
+
+          if [ "$OLD_IMAGES" != "[]" ]; then
+            echo "Deleting old ECR images..."
+
+            echo "$OLD_IMAGES" | jq .
+
+            aws ecr batch-delete-image \
+              --repository-name "$ECR_REPOSITORY" \
+              --region "$AWS_REGION" \
+              --image-ids "$OLD_IMAGES"
+
+            echo "Old images cleanup completed."
+          else
+            echo "No old images found."
+          fi
+
+          echo "Verifying remaining ECR images..."
+
+          aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --region "$AWS_REGION" \
+            --query 'length(imageDetails)' \
+            --output text
+
+      # 13. Deployment completed
       - name: Deployment completed
         run: |
           echo "======================================"
           echo "Daily Note DMS Deployment SUCCESS"
+          echo "Only latest ECR image retained."
           echo "======================================"
