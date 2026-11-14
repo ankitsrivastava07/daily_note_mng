@@ -1,3 +1,4 @@
+/*
 package com.daily_notes.notes.config;
 
 import io.github.bucket4j.Bucket;
@@ -30,3 +31,4 @@ public class RateLimiterHandlerInterceptor implements HandlerInterceptor {
     }
 
 }
+*/

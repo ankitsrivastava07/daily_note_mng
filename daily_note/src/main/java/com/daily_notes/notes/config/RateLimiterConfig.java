@@ -1,3 +1,4 @@
+/*
 package com.daily_notes.notes.config;
 
 import io.github.bucket4j.Bandwidth;
@@ -22,3 +23,4 @@ public class RateLimiterConfig {
 }
 
 
+*/

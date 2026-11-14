@@ -1,3 +1,4 @@
+/*
 package com.daily_notes.notes.config;
 
 import org.springframework.context.annotation.Configuration;
@@ -21,3 +22,4 @@ public class WebConfig implements WebMvcConfigurer {
 
 
 }
+*/
