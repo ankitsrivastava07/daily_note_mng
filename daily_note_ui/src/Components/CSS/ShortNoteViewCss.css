@@ -41,3 +41,80 @@
         height: 180px;
     }
 }
+
+
+/* DMS attachment loading container */
+.short-note-attachment-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+
+    width: 100%;
+    min-height: 160px;
+    padding: 24px 16px;
+    box-sizing: border-box;
+
+    background: linear-gradient(
+        135deg,
+        #f8faff 0%,
+        #f1f5ff 100%
+    );
+
+    border: 1px solid #e8eef8;
+    border-radius: 12px;
+
+    animation: dmsFadeIn 0.25s ease-out;
+}
+
+/* Professional loading GIF */
+.short-note-dms-loading-gif {
+    display: block;
+    width: 76px;
+    height: 76px;
+    object-fit: contain;
+}
+
+/* Loading message */
+.short-note-attachment-loading p {
+    margin: 0;
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    text-align: center;
+}
+
+/* Smooth entrance */
+@keyframes dmsFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Mobile responsiveness */
+@media (max-width: 600px) {
+    .short-note-attachment-loading {
+        min-height: 130px;
+        padding: 18px 12px;
+    }
+
+    .short-note-dms-loading-gif {
+        width: 60px;
+        height: 60px;
+    }
+}
+
+/* Accessibility */
+@media (prefers-reduced-motion: reduce) {
+    .short-note-attachment-loading {
+        animation: none;
+    }
+}
