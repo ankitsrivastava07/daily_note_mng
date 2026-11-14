@@ -6,8 +6,6 @@ import com.daily_note_dms.documents.dto.CreatePresignedUrlRequest;
 import com.daily_note_dms.documents.dto.DmsFileResponse;
 import com.daily_note_dms.documents.dto.DocumentDto;
 import com.daily_note_dms.documents.entity.DocumentEntity;
-import io.github.resilience4j.bulkhead.BulkheadFullException;
-import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -35,11 +33,11 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
-    @Bulkhead(
+/*    @Bulkhead(
             name = "DMS_S3_URL_PRESIGNED_GENERATE",
             type = Bulkhead.Type.SEMAPHORE,
             fallbackMethod = "createDocumentUploadPresignedURLFallback"
-    )
+    )*/
     public ApiResponse saveDocument(String referenceId,
                                     List<DocumentDto> documentDtos) {
         logger.info(" Save Documents are {}", documentDtos);
@@ -62,10 +60,10 @@ public class DocumentServiceImpl implements DocumentService {
 
     }
 
-    public ApiResponse createDocumentUploadPresignedURLFallback(String noteId, BulkheadFullException exp) {
+/*    public ApiResponse createDocumentUploadPresignedURLFallback(String noteId, BulkheadFullException exp) {
         logger.info("createFileUploadPresignedURLFallback has called {}", exp.getLocalizedMessage());
         return new ApiResponse().status(Boolean.FALSE).message("Something Went Wrong");
-    }
+    }*/
 
     @Override
     public ApiResponse getPresignedURL(String referenceId, List<String> fileName) {
