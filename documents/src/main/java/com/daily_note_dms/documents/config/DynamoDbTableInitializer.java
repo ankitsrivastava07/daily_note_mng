@@ -1,3 +1,4 @@
+/*
 package com.daily_note_dms.documents.config;
 
 import com.daily_note_dms.documents.entity.DocumentEntity;
@@ -88,3 +89,4 @@ public class DynamoDbTableInitializer {
         }
     }
 }
+*/
