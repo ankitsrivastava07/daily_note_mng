@@ -12,14 +12,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.regex.Pattern;
 
@@ -27,8 +25,6 @@ import static com.daily_notes.notes.utility.constant.NoteConstant.SUCCESS;
 
 @Service
 public class NoteServiceImpl implements NoteService {
-
-    private static final Pattern WHITESPACE_PATTERN = Pattern.compile("\\s+");
 
     private final NoteDaoService noteDaoService;
     private final Logger logger = LoggerFactory.getLogger(NoteServiceImpl.class);
@@ -70,7 +66,9 @@ public class NoteServiceImpl implements NoteService {
     public ApiResponse getNoteById(String noteId, String userId) {
         logger.info("Fetching note with id: {} for userId: {}", noteId, userId);
         NoteEntity note = noteDaoService.getNoteById(noteId, userId);
-        return new ApiResponse(SUCCESS, true, note, new ArrayList<>());
+        return new ApiResponse(SUCCESS, true,
+                note,
+                new ArrayList<>());
     }
 
     @Override
@@ -100,11 +98,26 @@ public class NoteServiceImpl implements NoteService {
     @Override
     public ApiResponse getAllNotes(String userId, Integer offset, Integer limit) {
         logger.info("Fetching notes for userId: {}, offset: {}, limit: {}", userId, offset, limit);
-        Pageable pageable = PageRequest.of(offset,
-                limit, Sort.by(Sort.Direction.DESC, "created_at"));
+       /* Pageable pageable = PageRequest.of(offset,
+                limit, Sort.by(Sort.Direction.DESC, "created_at"));*/
+        List<NoteEntity> notes = noteDaoService.getAllNotes(userId);
+        /*getAllNotesApiResponse(userId, notes, offset, limit, notes.size());*/
         return new ApiResponse(SUCCESS, true,
-                noteDaoService.getAllNotes(userId, pageable),
+                notes,
                 new ArrayList<>());
     }
 
+    /*public List<ApiResponse> getAllNotesApiResponse(String userId,
+                                                    List<NoteEntity> notes,
+                                                    Integer offset,
+                                                    Integer limit,
+                                                    Integer size) {
+        int end = Math.min(offset + limit, size);
+        List<NoteEntity> pageNotes = notes.subList(offset, end);
+        Pageable pageable = PageRequest.of(offset, limit, Sort.by(Sort.Direction.DESC, "created_at"));
+        ApiResponse apiResponse =
+                new ApiResponse(SUCCESS, true, pageNotes, new ArrayList<>());
+        offset += limit;
+        return new ArrayList<>();
+    }*/
 }

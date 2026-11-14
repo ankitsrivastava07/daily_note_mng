@@ -2,7 +2,6 @@ package com.daily_notes.notes.dao;
 
 import com.daily_notes.notes.entity.NoteEntity;
 import com.daily_notes.notes.utility.IdGenerator;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Repository;
 import software.amazon.awssdk.enhanced.dynamodb.*;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
@@ -81,7 +80,7 @@ public class NoteDaoServiceImpl implements NoteDaoService {
 
     @Override
     public List<NoteEntity> getAllNotes(
-            String userId, Pageable pageable) {
+            String userId) {
         QueryConditional condition =
                 QueryConditional.keyEqualTo(
                         Key.builder()

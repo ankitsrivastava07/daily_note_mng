@@ -6,11 +6,8 @@ import com.daily_notes.notes.dto.ShortNoteDto;
 import com.daily_notes.notes.entity.ShortNoteEntity;
 import com.daily_notes.notes.exceptions.exception.ShortEntityAlreadyExistException;
 import com.daily_notes.notes.mapper.CustomMapper;
-import com.daily_notes.notes.proxy.DMSFeignClient;
 import com.daily_notes.notes.records.ApiResponse;
 import com.daily_notes.notes.utility.constant.TokenUtil;
-import feign.FeignException;
-import org.apache.kafka.shaded.com.google.protobuf.Api;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,8 +16,6 @@ import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
 import java.util.Map;
 
 @Service
