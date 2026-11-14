@@ -1,138 +1,41 @@
+REGION="ap-south-1"
+REPO="dailynote"
+FUNCTION="daily_note_app"
 
-name: Deploy Daily Note
+# Get image currently deployed in Lambda
+DEPLOYED_URI=$(aws lambda get-function \
+  --function-name "$FUNCTION" \
+  --region "$REGION" \
+  --query 'Code.ResolvedImageUri' \
+  --output text)
 
-on:
-  push:
-    branches:
-      - main
-    paths:
-      - "daily_note/**"
-      - ".github/workflows/deploy-daily-note.yml"
-  workflow_dispatch:
+KEEP_DIGEST="${DEPLOYED_URI##*@}"
 
-permissions:
-  contents: read
+echo "Keeping Lambda image: $KEEP_DIGEST"
 
-jobs:
-  build-and-push:
-    runs-on: ubuntu-latest
+# Find all other images
+OLD_IMAGES=$(aws ecr list-images \
+  --repository-name "$REPO" \
+  --region "$REGION" \
+  --filter tagStatus=ANY \
+  --output json | jq -c \
+  --arg digest "$KEEP_DIGEST" \
+  '[.imageIds[]
+    | select(.imageDigest != $digest)
+    | {imageDigest: .imageDigest}]
+    | unique_by(.imageDigest)')
 
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+# Delete old images
+if [ "$OLD_IMAGES" != "[]" ]; then
+  aws ecr batch-delete-image \
+    --repository-name "$REPO" \
+    --region "$REGION" \
+    --image-ids "$OLD_IMAGES"
+fi
 
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: maven
-
-      - name: Build Spring Boot application
-        working-directory: daily_note
-        run: |
-          chmod +x mvnw
-          ./mvnw clean package -DskipTests
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ECR_ACCESSKEY }}
-          aws-secret-access-key: ${{ secrets.AWS_ECR_SECRET_KEY }}
-          aws-region: ap-south-1
-
-      - name: Check Lambda architecture
-        id: architecture
-        run: |
-          ARCH=$(aws lambda get-function-configuration \
-            --function-name daily_note_app \
-            --region ap-south-1 \
-            --query 'Architectures[0]' \
-            --output text)
-
-          echo "Lambda architecture: $ARCH"
-
-          if [ "$ARCH" = "x86_64" ]; then
-            echo "platform=linux/amd64" >> "$GITHUB_OUTPUT"
-          elif [ "$ARCH" = "arm64" ]; then
-            echo "platform=linux/arm64" >> "$GITHUB_OUTPUT"
-          else
-            echo "Unsupported Lambda architecture: $ARCH"
-            exit 1
-          fi
-
-      - name: Login to Amazon ECR
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build and Push Docker Image
-        env:
-          ECR_REGISTRY: 446394402725.dkr.ecr.ap-south-1.amazonaws.com
-          IMAGE_TAG: ${{ github.sha }}
-          PLATFORM: ${{ steps.architecture.outputs.platform }}
-        run: |
-          docker buildx build \
-            --platform "$PLATFORM" \
-            --provenance=false \
-            --sbom=false \
-            --output "type=image,name=$ECR_REGISTRY/dailynote:$IMAGE_TAG,push=true,oci-mediatypes=false,compression=gzip" \
-            -f daily_note/Dockerfile \
-            daily_note
-
-      - name: Verify ECR image manifest
-        env:
-          ECR_REGISTRY: 446394402725.dkr.ecr.ap-south-1.amazonaws.com
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker buildx imagetools inspect \
-            "$ECR_REGISTRY/dailynote:$IMAGE_TAG"
-
-          docker buildx imagetools inspect --raw \
-            "$ECR_REGISTRY/dailynote:$IMAGE_TAG"
-
-      - name: Deploy to AWS Lambda
-        env:
-          ECR_REGISTRY: 446394402725.dkr.ecr.ap-south-1.amazonaws.com
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          aws lambda update-function-code \
-            --function-name daily_note_app \
-            --image-uri "$ECR_REGISTRY/dailynote:$IMAGE_TAG" \
-            --region ap-south-1
-
-      - name: Wait for Lambda deployment
-        run: |
-          aws lambda wait function-updated-v2 \
-            --function-name daily_note_app \
-            --region ap-south-1
-
-      - name: Verify deployed image
-        env:
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          EXPECTED_DIGEST=$(aws ecr describe-images \
-            --repository-name dailynote \
-            --image-ids imageTag="$IMAGE_TAG" \
-            --region ap-south-1 \
-            --query 'imageDetails[0].imageDigest' \
-            --output text)
-
-          DEPLOYED_URI=$(aws lambda get-function \
-            --function-name daily_note_app \
-            --region ap-south-1 \
-            --query 'Code.ResolvedImageUri' \
-            --output text)
-
-          EXPECTED_URI="446394402725.dkr.ecr.ap-south-1.amazonaws.com/dailynote@$EXPECTED_DIGEST"
-
-          echo "Expected image: $EXPECTED_URI"
-          echo "Deployed image: $DEPLOYED_URI"
-
-          if [ "$EXPECTED_URI" = "$DEPLOYED_URI" ]; then
-            echo "Lambda image verification successful."
-          else
-            echo "ERROR: Lambda image digest does not match."
-            exit 1
-          fi
+# Verify
+aws ecr describe-images \
+  --repository-name "$REPO" \
+  --region "$REGION" \
+  --query 'length(imageDetails)' \
+  --output text
