@@ -1,41 +1,229 @@
-REGION="ap-south-1"
-REPO="dailynote"
-FUNCTION="daily_note_app"
 
-# Get image currently deployed in Lambda
-DEPLOYED_URI=$(aws lambda get-function \
-  --function-name "$FUNCTION" \
-  --region "$REGION" \
-  --query 'Code.ResolvedImageUri' \
-  --output text)
+name: Deploy Daily Note
 
-KEEP_DIGEST="${DEPLOYED_URI##*@}"
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "daily_note/**"
+      - ".github/workflows/deploy-daily-note.yml"
 
-echo "Keeping Lambda image: $KEEP_DIGEST"
+  workflow_dispatch:
 
-# Find all other images
-OLD_IMAGES=$(aws ecr list-images \
-  --repository-name "$REPO" \
-  --region "$REGION" \
-  --filter tagStatus=ANY \
-  --output json | jq -c \
-  --arg digest "$KEEP_DIGEST" \
-  '[.imageIds[]
-    | select(.imageDigest != $digest)
-    | {imageDigest: .imageDigest}]
-    | unique_by(.imageDigest)')
+permissions:
+  contents: read
 
-# Delete old images
-if [ "$OLD_IMAGES" != "[]" ]; then
-  aws ecr batch-delete-image \
-    --repository-name "$REPO" \
-    --region "$REGION" \
-    --image-ids "$OLD_IMAGES"
-fi
+concurrency:
+  group: daily-note-deployment
+  cancel-in-progress: false
 
-# Verify
-aws ecr describe-images \
-  --repository-name "$REPO" \
-  --region "$REGION" \
-  --query 'length(imageDetails)' \
-  --output text
+env:
+  AWS_REGION: ap-south-1
+  AWS_ACCOUNT_ID: "446394402725"
+  ECR_REPOSITORY: dailynote
+  LAMBDA_FUNCTION_NAME: daily_note_app
+
+jobs:
+  build-and-push:
+    name: Build and Deploy Daily Note
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Set up Java 17
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      # 3. Build Spring Boot application
+      - name: Build Spring Boot application
+        working-directory: daily_note
+        run: |
+          chmod +x mvnw
+          ./mvnw clean package -DskipTests
+
+      # 4. Configure AWS credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ECR_ACCESSKEY }}
+          aws-secret-access-key: ${{ secrets.AWS_ECR_SECRET_KEY }}
+          aws-region: ap-south-1
+
+      # 5. Check Lambda architecture
+      - name: Check Lambda architecture
+        id: architecture
+        run: |
+          ARCH=$(aws lambda get-function-configuration \
+            --function-name daily_note_app \
+            --region ap-south-1 \
+            --query 'Architectures[0]' \
+            --output text)
+
+          echo "Lambda architecture: $ARCH"
+
+          if [ "$ARCH" = "x86_64" ]; then
+            echo "platform=linux/amd64" >> "$GITHUB_OUTPUT"
+          elif [ "$ARCH" = "arm64" ]; then
+            echo "platform=linux/arm64" >> "$GITHUB_OUTPUT"
+          else
+            echo "Unsupported Lambda architecture: $ARCH"
+            exit 1
+          fi
+
+      # 6. Login to Amazon ECR
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 7. Setup Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # 8. Build and Push Docker Image
+      - name: Build and Push Docker Image
+        env:
+          ECR_REGISTRY: 446394402725.dkr.ecr.ap-south-1.amazonaws.com
+          IMAGE_TAG: ${{ github.sha }}
+          PLATFORM: ${{ steps.architecture.outputs.platform }}
+        run: |
+          docker buildx build \
+            --platform "$PLATFORM" \
+            --provenance=false \
+            --sbom=false \
+            --output "type=image,name=$ECR_REGISTRY/dailynote:$IMAGE_TAG,push=true,oci-mediatypes=false,compression=gzip" \
+            -f daily_note/Dockerfile \
+            daily_note
+
+      # 9. Verify ECR image manifest
+      - name: Verify ECR image manifest
+        env:
+          ECR_REGISTRY: 446394402725.dkr.ecr.ap-south-1.amazonaws.com
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker buildx imagetools inspect \
+            "$ECR_REGISTRY/dailynote:$IMAGE_TAG"
+
+          docker buildx imagetools inspect --raw \
+            "$ECR_REGISTRY/dailynote:$IMAGE_TAG"
+
+      # 10. Deploy to AWS Lambda
+      - name: Deploy to AWS Lambda
+        env:
+          ECR_REGISTRY: 446394402725.dkr.ecr.ap-south-1.amazonaws.com
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          aws lambda update-function-code \
+            --function-name daily_note_app \
+            --image-uri "$ECR_REGISTRY/dailynote:$IMAGE_TAG" \
+            --region ap-south-1
+
+      # 11. Wait for Lambda deployment
+      - name: Wait for Lambda deployment
+        run: |
+          aws lambda wait function-updated-v2 \
+            --function-name daily_note_app \
+            --region ap-south-1
+
+      # 12. Verify deployed image
+      - name: Verify deployed image
+        env:
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -e
+
+          EXPECTED_DIGEST=$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG" \
+            --region "$AWS_REGION" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)
+
+          DEPLOYED_URI=$(aws lambda get-function \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION" \
+            --query 'Code.ResolvedImageUri' \
+            --output text)
+
+          EXPECTED_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}@${EXPECTED_DIGEST}"
+
+          echo "Expected image: $EXPECTED_URI"
+          echo "Deployed image: $DEPLOYED_URI"
+
+          if [ "$EXPECTED_URI" = "$DEPLOYED_URI" ]; then
+            echo "Lambda image verification successful."
+          else
+            echo "ERROR: Lambda image digest does not match."
+            exit 1
+          fi
+
+      # 13. Cleanup old ECR images
+      - name: Cleanup old ECR images
+        run: |
+          set -e
+
+          echo "Getting currently deployed image..."
+
+          DEPLOYED_URI=$(aws lambda get-function \
+            --function-name "$LAMBDA_FUNCTION_NAME" \
+            --region "$AWS_REGION" \
+            --query 'Code.ResolvedImageUri' \
+            --output text)
+
+          CURRENT_DIGEST="${DEPLOYED_URI##*@}"
+
+          if [ -z "$CURRENT_DIGEST" ] || [ "$CURRENT_DIGEST" = "None" ]; then
+            echo "ERROR: Could not identify deployed image."
+            exit 1
+          fi
+
+          echo "Keeping deployed digest: $CURRENT_DIGEST"
+
+          OLD_IMAGES=$(aws ecr list-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --region "$AWS_REGION" \
+            --filter tagStatus=ANY \
+            --output json | jq -c \
+            --arg digest "$CURRENT_DIGEST" \
+            '[.imageIds[]
+              | select(.imageDigest != $digest)
+              | {imageDigest: .imageDigest}]
+              | unique_by(.imageDigest)')
+
+          if [ "$OLD_IMAGES" != "[]" ]; then
+            echo "Deleting old ECR images..."
+
+            echo "$OLD_IMAGES" | jq .
+
+            aws ecr batch-delete-image \
+              --repository-name "$ECR_REPOSITORY" \
+              --region "$AWS_REGION" \
+              --image-ids "$OLD_IMAGES"
+
+            echo "Old images cleanup completed."
+          else
+            echo "No old images found."
+          fi
+
+          echo "Remaining image count:"
+
+          aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --region "$AWS_REGION" \
+            --query 'length(imageDetails)' \
+            --output text
+
+      # 14. Deployment completed
+      - name: Deployment completed
+        run: |
+          echo "======================================"
+          echo "Daily Note Deployment SUCCESS"
+          echo "Only current Lambda image retained."
+          echo "======================================"
