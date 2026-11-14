@@ -3,7 +3,7 @@ package com.daily_note_dms.documents.service;
 import com.daily_note_dms.documents.dto.ApiResponse;
 import com.daily_note_dms.documents.dto.CreatePresignedUrlRequest;
 import com.daily_note_dms.documents.utillity.DMSConstant;
-import io.github.resilience4j.bulkhead.annotation.Bulkhead;
+//import io.github.resilience4j.bulkhead.annotation.Bulkhead;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -27,9 +27,9 @@ public class S3ServiceImpl implements S3Service {
     private DMSConstant dmsConstant;
 
     @Override
-    @Bulkhead(name = "GENERATE_PRESIGNED_URL",
+    /*@Bulkhead(name = "GENERATE_PRESIGNED_URL",
             type = Bulkhead.Type.SEMAPHORE
-            , fallbackMethod = "generateUploadUrlFallbackMethod")
+            , fallbackMethod = "generateUploadUrlFallbackMethod")*/
     public String createPresignedURL(CreatePresignedUrlRequest createPresignedUrlRequest) {
         //String path = dmsConstant.getS3BucketFolder(createPresignedUrlRequest.contentType());
         String objectKey = createPresignedUrlRequest.referenceId() + "/" + System.currentTimeMillis() + "_" + createPresignedUrlRequest.fileName();
