@@ -129,9 +129,6 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         }
 
         ShortNoteDto shortNoteDto = new ShortNoteDto();
-        shortNoteDto.setNumberOfAttachments(shortNote.getAttachement() == null ? 0
-                : shortNote.getAttachement());
-
         shortNoteDto.setContent(shortNote.getContent());
         shortNoteDto.setTitle(shortNote.getTitle());
         shortNoteDto.setCreatedAt(shortNote.getCreatedAt());
