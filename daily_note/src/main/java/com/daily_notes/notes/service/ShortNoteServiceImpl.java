@@ -9,6 +9,7 @@ import com.daily_notes.notes.exceptions.exception.ShortEntityAlreadyExistExcepti
 import com.daily_notes.notes.exceptions.exception.ShortEntityNotFoundException;
 import com.daily_notes.notes.mapper.CustomMapper;
 import com.daily_notes.notes.records.ApiResponse;
+import com.daily_notes.notes.utility.constant.ApiResponseConstant;
 import com.daily_notes.notes.utility.constant.TokenUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -71,19 +72,17 @@ public class ShortNoteServiceImpl implements ShortNoteService {
                 entity.getId(),
                 entity.getCreatedAt()
         );
-
         entity = shortNoteDao.createShortNote(entity);
 
         return new ApiResponse()
                 .success(Boolean.TRUE)
                 .data(entity)
-                .message("Success");
+                .message(ApiResponseConstant.API_RESPONSE_SUCCESS);
     }
 
     @Override
     public ApiResponse updateShortNote(
             UpdateShortNoteDto updateShortNoteDto) throws Exception {
-
         logger.info("Updating short note for userId: {}, noteId: {}",
                 updateShortNoteDto.userId(),
                 updateShortNoteDto.id());
@@ -163,7 +162,7 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         }
         return new ApiResponse()
                 .success(Boolean.TRUE)
-                .message("Short note fetched successfully")
+                .message(ApiResponseConstant.API_RESPONSE_SUCCESS)
                 .data(shortNoteDto);
     }
 
@@ -179,6 +178,8 @@ public class ShortNoteServiceImpl implements ShortNoteService {
     public ApiResponse deleteShortNoteById(String userId, String noteId) {
         logger.info("Deleting short note with noteId: {}, userId: {}", noteId, userId);
         shortNoteDao.deleteShortNoteById(userId, noteId);
-        return new ApiResponse().success(Boolean.TRUE).message("Short note deleted successfully");
+        return new ApiResponse()
+                .success(Boolean.TRUE)
+                .message("Short note deleted successfully");
     }
 }
