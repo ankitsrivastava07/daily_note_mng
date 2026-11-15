@@ -4,7 +4,7 @@ import java.io.Serializable;
 
 public record
 CreateShortNoteDto(String categoryId, String title, String content,
-                   String userId, Integer numberOfAttachments) implements Serializable {
+                   String userId, Integer attachment) implements Serializable {
 
     public CreateShortNoteDto(String categoryId, String userId) {
         this(categoryId, "", "", userId, 0);

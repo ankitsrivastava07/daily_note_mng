@@ -1,6 +1,7 @@
 package com.daily_notes.notes.mapper;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -10,8 +11,8 @@ public class CustomMapper {
             new ObjectMapper()
                     .registerModule(new JavaTimeModule())
                     .disable(
-                            SerializationFeature.WRITE_DATES_AS_TIMESTAMPS
-                    );
+                            SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    // .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
     public static <T> T mapToEntity(Object source, Class<T> targetType) {
         return mapper.convertValue(source, targetType);
