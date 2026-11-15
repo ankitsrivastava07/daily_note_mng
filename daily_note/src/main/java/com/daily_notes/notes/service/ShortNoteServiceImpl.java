@@ -49,7 +49,7 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         Instant createdAt = Instant.now();
         entity.setCreatedAt(createdAt);
         entity.setUpdateAt(createdAt);
-        entity.setAttachement(createShortNoteDto.attachment()); // Initialize attachment count
+        entity.setAttachement(createShortNoteDto.attachement()); // Initialize attachment count
         String token = TokenUtil.generateToken(
                 createShortNoteDto.userId(),
                 createShortNoteDto.title()
