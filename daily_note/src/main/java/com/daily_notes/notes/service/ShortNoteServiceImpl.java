@@ -33,7 +33,6 @@ public class ShortNoteServiceImpl implements ShortNoteService {
     @Override
     public ApiResponse createShortNote(
             CreateShortNoteDto createShortNoteDto) throws Exception {
-
         logger.info("Creating short note for userId: {}",
                 createShortNoteDto.userId());
 
@@ -47,6 +46,7 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         Instant createdAt = Instant.now();
         entity.setCreatedAt(createdAt);
         entity.setUpdateAt(createdAt);
+        entity.setAttachement(bucketName + "/" + entity.getId());
         String token = TokenUtil.generateToken(
                 createShortNoteDto.userId(),
                 createShortNoteDto.title()
@@ -83,7 +83,6 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         logger.info("Fetching short note with shortNoteId: {}, userId: {}", shortNoteId, userId);
         ShortNoteEntity shortNote =
                 shortNoteDao.getShortNoteById(userId, shortNoteId);
-        ApiResponse apiResponse;
        /* try {
             logger.info("Retrieved short note: {}", shortNote);
             apiResponse = dmsFeignClient
@@ -107,7 +106,7 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         }
 
         ShortNoteDto shortNoteDto = new ShortNoteDto();
-        shortNoteDto.setPath(bucketName + "/" + shortNote.getId());
+        shortNoteDto.setPath(shortNote.getAttachement());
         shortNoteDto.setContent(shortNote.getContent());
         shortNoteDto.setTitle(shortNote.getTitle());
         shortNoteDto.setCreatedAt(shortNote.getCreatedAt());
