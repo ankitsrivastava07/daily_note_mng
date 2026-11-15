@@ -3,8 +3,10 @@ package com.daily_notes.notes.service;
 import com.daily_notes.notes.dao.ShortNoteDao;
 import com.daily_notes.notes.dto.CreateShortNoteDto;
 import com.daily_notes.notes.dto.ShortNoteDto;
+import com.daily_notes.notes.dto.UpdateShortNoteDto;
 import com.daily_notes.notes.entity.ShortNoteEntity;
 import com.daily_notes.notes.exceptions.exception.ShortEntityAlreadyExistException;
+import com.daily_notes.notes.exceptions.exception.ShortEntityNotFoundException;
 import com.daily_notes.notes.mapper.CustomMapper;
 import com.daily_notes.notes.records.ApiResponse;
 import com.daily_notes.notes.utility.constant.TokenUtil;
@@ -46,7 +48,7 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         Instant createdAt = Instant.now();
         entity.setCreatedAt(createdAt);
         entity.setUpdateAt(createdAt);
-        entity.setAttachement(bucketName + "/" + entity.getId());
+        entity.setAttachement(createShortNoteDto.numberOfAttachments()); // Initialize attachment count
         String token = TokenUtil.generateToken(
                 createShortNoteDto.userId(),
                 createShortNoteDto.title()
@@ -78,39 +80,63 @@ public class ShortNoteServiceImpl implements ShortNoteService {
     }
 
     @Override
+    public ApiResponse updateShortNote(
+            UpdateShortNoteDto updateShortNoteDto) throws Exception {
+
+        logger.info("Updating short note for userId: {}, noteId: {}",
+                updateShortNoteDto.userId(),
+                updateShortNoteDto.id());
+
+        ShortNoteEntity entity = shortNoteDao.getShortNoteById(
+                updateShortNoteDto.userId(),
+                updateShortNoteDto.id()
+        );
+
+        if (entity == null) {
+            throw new ShortEntityNotFoundException(
+                    "Short note not found."
+            );
+        }
+
+        // Update only user-editable fields
+        entity.setCategoryId(updateShortNoteDto.categoryId());
+        entity.setTitle(updateShortNoteDto.title());
+        entity.setContent(updateShortNoteDto.content());
+
+        entity.setUpdateAt(Instant.now());
+        entity = shortNoteDao.updateShortNote(entity);
+
+        logger.info(
+                "SHORT_NOTE_UPDATED userId={} noteId={}",
+                entity.getUserId(),
+                entity.getId()
+        );
+
+        return new ApiResponse()
+                .success(Boolean.TRUE)
+                .data(entity)
+                .message("Short note updated successfully");
+    }
+
+    @Override
     public ApiResponse getShortNoteById(String userId, String shortNoteId) {
 
         logger.info("Fetching short note with shortNoteId: {}, userId: {}", shortNoteId, userId);
         ShortNoteEntity shortNote =
                 shortNoteDao.getShortNoteById(userId, shortNoteId);
-       /* try {
-            logger.info("Retrieved short note: {}", shortNote);
-            apiResponse = dmsFeignClient
-                    .getAllDocumentsByShortNoteId(shortNoteId)
-                    .getBody();
-
-            logger.info("Retrieved short note: {}", apiResponse);
-        } catch (FeignException.BadGateway e) {
-            logger.error("Error while fetching documents for short note ID: {}", shortNoteId, e);
-            return new ApiResponse()
-                    .success(Boolean.FALSE)
-                    .message("We couldn't load the documents right now. Please try again shortly.")
-                    .error("Service temporarily unavailable");
-        }*/
-
         if (shortNote == null) {
-            return new ApiResponse()
-                    .success(Boolean.FALSE)
-                    .message("Short note not found")
-                    .error("No record found for ID: " + shortNoteId);
+            throw new ShortEntityNotFoundException("Short note not found.");
         }
 
         ShortNoteDto shortNoteDto = new ShortNoteDto();
-        shortNoteDto.setPath(shortNote.getAttachement());
+        shortNoteDto.setNumberOfAttachments(shortNote.getAttachement() == null ? 0
+                : shortNote.getAttachement());
+
         shortNoteDto.setContent(shortNote.getContent());
         shortNoteDto.setTitle(shortNote.getTitle());
         shortNoteDto.setCreatedAt(shortNote.getCreatedAt());
-        //shortNoteDto.setDownloadUrl((List<String>) apiResponse.data());
+        if (shortNote.getAttachement() == null)
+            shortNoteDto.setPath(bucketName + "/" + shortNote.getUserId() + "/" + shortNote.getId());
 
         return new ApiResponse()
                 .success(Boolean.TRUE)

@@ -13,16 +13,25 @@ public class ShortNoteEntity extends BaseEntity {
     private String uniqueToken;
     private String title;
 
-    public String getAttachement() {
+    public Integer getAttachement() {
         return attachement;
     }
 
-    public void setAttachement(String attachement) {
+    public void setAttachement(Integer attachement) {
         this.attachement = attachement;
     }
 
     private String categoryId;
-    private String attachement;
+    private Integer attachement;
+    private String path;
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
+    }
 
     public String getName() {
         return name;

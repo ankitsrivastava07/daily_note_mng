@@ -46,6 +46,15 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
         return table.getItem(Key.builder().partitionValue(userId).sortValue(shortNoteId).build());
     }
 
+    // UPDATE SHORT NOTE
+    @Override
+    public ShortNoteEntity updateShortNote(ShortNoteEntity entity) {
+        logger.info("Updating short note: {}", entity.getId());
+        table.updateItem(entity);
+        logger.info("Short note updated successfully: {}", entity.getId());
+        return entity;
+    }
+
     @Override
     public Page<ShortNoteEntity> getAllShortNotes(String userId, int limit, Map<String, AttributeValue> lastEvaluatedKey) {
         DynamoDbIndex<ShortNoteEntity> index = table.index("shortnote_createdAt_index");

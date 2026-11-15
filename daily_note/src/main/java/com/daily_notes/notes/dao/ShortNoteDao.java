@@ -22,4 +22,6 @@ public interface ShortNoteDao {
     void deleteShortNoteById(String userId, String noteId);
 
     ShortNoteEntity getShortNoteById(String userId, String shortNoteId);
+
+    ShortNoteEntity updateShortNote(ShortNoteEntity entity);
 }

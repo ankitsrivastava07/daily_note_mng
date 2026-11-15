@@ -114,94 +114,102 @@ function ShortNoteView() {
                 // ==========================================
 
                 try {
-                    // Create a minimum 5-second timer for the attachment loading state
-                    const minTimerPromise = new Promise((resolve) =>
+                    // Keep the attachment loading indicator visible for at least 5 seconds.
+                    const minTimerPromise = new Promise<void>((resolve) =>
                         setTimeout(resolve, 5000)
                     );
 
-                    const dmsUrl =
-                        `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(referenceId)}/dms`;
+                    // Declare attachments outside the conditional block so it remains
+                    // available when updating shortNote below.
+                    let attachments: Attachment[] = [];
 
-                    const dmsPromise = fetch(dmsUrl, {
-                        method: "GET",
-                        headers: {
-                            userid: userId,
-                            Accept: "application/json"
-                        },
-                        signal: controller.signal
-                    });
+                    // Fetch DMS files only when the note has a valid DMS path.
+                    if (noteResult.data.numberOfAttachments > 0 || noteResult.data.path?.length > 0) {
+                        const dmsUrl =
+                            `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(referenceId)}/dms`;
 
-                    const [dmsResponse] = await Promise.all([
-                        dmsPromise,
-                        minTimerPromise
-                    ]);
+                        const [dmsResponse] = await Promise.all([
+                            fetch(dmsUrl, {
+                                method: "GET",
+                                headers: {
+                                    userid: userId,
+                                    Accept: "application/json"
+                                },
+                                signal: controller.signal
+                            }),
+                            minTimerPromise
+                        ]);
 
-                    if (!dmsResponse.ok) {
-                        throw new Error(
-                            await dmsResponse.text() ||
-                            `DMS API failed: ${dmsResponse.status}`
-                        );
-                    }
+                        if (!dmsResponse.ok) {
+                            throw new Error(
+                                await dmsResponse.text() ||
+                                `DMS API failed: ${dmsResponse.status}`
+                            );
+                        }
 
-                    const dmsResult = await dmsResponse.json();
+                        const dmsResult = await dmsResponse.json();
 
-                    if (dmsResult.success === false) {
-                        throw new Error(
-                            dmsResult.message || "DMS retrieval failed."
-                        );
-                    }
+                        if (dmsResult.success === false) {
+                            throw new Error(
+                                dmsResult.message || "DMS retrieval failed."
+                            );
+                        }
 
-                    const files = Array.isArray(dmsResult.data)
-                        ? dmsResult.data
-                        : Array.isArray(dmsResult.data?.files)
-                            ? dmsResult.data.files
-                            : [];
+                        const files = Array.isArray(dmsResult.data)
+                            ? dmsResult.data
+                            : Array.isArray(dmsResult.data?.files)
+                                ? dmsResult.data.files
+                                : [];
 
-                    const attachments: Attachment[] = files
-                        .map((file: any, index: number) => {
-                            const downloadUrl =
-                                typeof file === "string"
-                                    ? file
-                                    : file.downloadUrl ||
-                                      file.presignedUrl ||
-                                      file.url;
+                        attachments = files
+                            .map((file: any, index: number) => {
+                                const downloadUrl =
+                                    typeof file === "string"
+                                        ? file
+                                        : file.downloadUrl ||
+                                        file.presignedUrl ||
+                                        file.url;
 
-                            if (
-                                typeof downloadUrl !== "string" ||
-                                !downloadUrl.startsWith("https://")
-                            ) {
-                                return null;
-                            }
+                                if (
+                                    typeof downloadUrl !== "string" ||
+                                    !downloadUrl.startsWith("https://")
+                                ) {
+                                    return null;
+                                }
 
-                            let fileName =
-                                typeof file === "object"
-                                    ? file.fileName ||
-                                      file.originalFileName ||
-                                      file.name
-                                    : null;
+                                let fileName =
+                                    typeof file === "object" && file !== null
+                                        ? file.fileName ||
+                                        file.originalFileName ||
+                                        file.name
+                                        : null;
 
-                            if (!fileName) {
-                                fileName = thisGetFileName(
+                                if (!fileName) {
+                                    fileName = thisGetFileName(
+                                        downloadUrl,
+                                        index
+                                    );
+                                }
+
+                                return {
+                                    fileName,
                                     downloadUrl,
-                                    index
-                                );
-                            }
-
-                            return {
-                                fileName,
-                                downloadUrl,
-                                contentType:
-                                    typeof file === "object"
-                                        ? file.contentType ||
-                                          file.mimeType ||
-                                          ""
-                                        : ""
-                            };
-                        })
-                        .filter(
-                            (file: Attachment | null): file is Attachment =>
-                                file !== null
-                        );
+                                    contentType:
+                                        typeof file === "object" && file !== null
+                                            ? file.contentType ||
+                                            file.mimeType ||
+                                            ""
+                                            : ""
+                                };
+                            })
+                            .filter(
+                                (file: Attachment | null): file is Attachment =>
+                                    file !== null
+                            );
+                    } else {
+                        // Preserve the minimum loading duration even when no DMS path exists.
+                        await minTimerPromise;
+                    }
 
                     if (!controller.signal.aborted) {
                         setShortNote((prev) =>

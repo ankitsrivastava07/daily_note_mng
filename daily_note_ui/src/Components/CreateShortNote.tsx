@@ -408,7 +408,9 @@ function CreateShortNote() {
         // Use a stable snapshot so the same files are used throughout this request.
         const submittedFiles = [...files];
         const submittedFileCount = submittedFiles.length;
-        const notePayload = { ...inputValue };
+        const notePayload = { ...inputValue,
+            numberOfAttachments: submittedFileCount
+         };
         const submissionSignature = JSON.stringify({
             note: notePayload,
             files: submittedFiles.map(({ file }) => ({

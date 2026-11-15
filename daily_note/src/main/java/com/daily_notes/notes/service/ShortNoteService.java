@@ -1,6 +1,7 @@
 package com.daily_notes.notes.service;
 
 import com.daily_notes.notes.dto.CreateShortNoteDto;
+import com.daily_notes.notes.dto.UpdateShortNoteDto;
 import com.daily_notes.notes.entity.ShortNoteEntity;
 import com.daily_notes.notes.records.ApiResponse;
 import org.apache.kafka.shaded.com.google.protobuf.Api;
@@ -16,6 +17,9 @@ public interface ShortNoteService {
     Page<ShortNoteEntity> getAllShortNotes(String userId, Integer limit, Map<String, AttributeValue> attributeValueMap);
 
     ApiResponse deleteShortNoteById(String userId, String noteId);
+
+    ApiResponse updateShortNote(UpdateShortNoteDto updateShortNoteDto)
+            throws Exception;
 
     ApiResponse getShortNoteById(String userId, String shortNoteId);
 }

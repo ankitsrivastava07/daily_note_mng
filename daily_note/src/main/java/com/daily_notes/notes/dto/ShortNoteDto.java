@@ -4,16 +4,25 @@ import java.time.Instant;
 import java.util.List;
 
 public class ShortNoteDto {
-
-    private String name;
-    private String path;
-
     public String getPath() {
         return path;
     }
 
     public void setPath(String path) {
         this.path = path;
+    }
+
+    private String name;
+    private Integer numberOfAttachments;
+
+    private String path;
+
+    public Integer getNumberOfAttachments() {
+        return numberOfAttachments;
+    }
+
+    public void setNumberOfAttachments(Integer numberOfAttachments) {
+        this.numberOfAttachments = numberOfAttachments;
     }
 
     public Instant getCreatedAt() {
