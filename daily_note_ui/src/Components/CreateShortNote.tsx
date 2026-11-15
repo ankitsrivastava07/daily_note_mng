@@ -409,7 +409,7 @@ function CreateShortNote() {
         const submittedFiles = [...files];
         const submittedFileCount = submittedFiles.length;
         const notePayload = { ...inputValue,
-            numberOfAttachments: submittedFileCount
+            attachment: submittedFileCount
          };
         const submissionSignature = JSON.stringify({
             note: notePayload,
