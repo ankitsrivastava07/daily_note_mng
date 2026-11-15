@@ -82,4 +82,23 @@ public class ShortNoteDaoImpl implements ShortNoteDao {
         );
         logger.info("Short note deleted successfully for Short Note Id : {}", entity.getId());
     }
+
+    @Override
+    public ShortNoteEntity updateShortNoteField(String noteId, String userId, int attachmentCount) {
+        logger.info("Updating attachment count for short note: {}", noteId);
+
+        // 1. Pehle existing item ko fetch karo ya key define karo
+        Key key = Key.builder().partitionValue(userId).sortValue(noteId).build();
+
+        // 2. Update Expression use karke sirf specific attribute update karo
+        // (Yeh tab kaam aata hai jab aapko poora object overwrite nahi karna)
+        ShortNoteEntity existingEntity = table.getItem(key);
+        if (existingEntity != null) {
+            existingEntity.setAttachement(attachmentCount);
+            table.putItem(existingEntity); // Ya UpdateItemEnhancedRequest
+        }
+
+        logger.info("Short note attribute updated successfully: {}", noteId);
+        return existingEntity;
+    }
 }

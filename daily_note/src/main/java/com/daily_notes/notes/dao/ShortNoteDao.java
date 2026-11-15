@@ -24,4 +24,6 @@ public interface ShortNoteDao {
     ShortNoteEntity getShortNoteById(String userId, String shortNoteId);
 
     ShortNoteEntity updateShortNote(ShortNoteEntity entity);
+
+    ShortNoteEntity updateShortNoteField(String noteId, String userId, int attachmentCount);
 }

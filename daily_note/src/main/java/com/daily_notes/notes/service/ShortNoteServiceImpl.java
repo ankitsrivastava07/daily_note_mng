@@ -13,20 +13,21 @@ import com.daily_notes.notes.utility.constant.TokenUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
 import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 import java.time.Instant;
-import java.util.Map;
+import java.util.*;
 
 @Service
 public class ShortNoteServiceImpl implements ShortNoteService {
 
     private final ShortNoteDao shortNoteDao;
     private final Logger logger = LoggerFactory.getLogger(ShortNoteServiceImpl.class);
-    @Value("${aws.s3.bucket-name}")
-    private String bucketName;
 
     public ShortNoteServiceImpl(ShortNoteDao shortNoteDao) {
         this.shortNoteDao = shortNoteDao;
@@ -120,7 +121,6 @@ public class ShortNoteServiceImpl implements ShortNoteService {
 
     @Override
     public ApiResponse getShortNoteById(String userId, String shortNoteId) {
-
         logger.info("Fetching short note with shortNoteId: {}, userId: {}", shortNoteId, userId);
         ShortNoteEntity shortNote =
                 shortNoteDao.getShortNoteById(userId, shortNoteId);
@@ -135,9 +135,35 @@ public class ShortNoteServiceImpl implements ShortNoteService {
         shortNoteDto.setContent(shortNote.getContent());
         shortNoteDto.setTitle(shortNote.getTitle());
         shortNoteDto.setCreatedAt(shortNote.getCreatedAt());
-        if (shortNote.getAttachement() == null)
-            shortNoteDto.setPath(bucketName + "/" + shortNote.getUserId() + "/" + shortNote.getId());
+        if (shortNote.getAttachement() == null) {
+            final RestTemplate restTemplate = new RestTemplate();
 
+            var externalUrl = UriComponentsBuilder
+                    .fromUriString("https://zgtu2eqrhio3lmkx3jssssvfbq0mgsip.lambda-url.ap-south-1.on.aws/api/v1/{id}/dms")
+                    .buildAndExpand(shortNoteId)
+                    .toUriString();
+
+            // 1. Set Accept header to request JSON from the external API
+            HttpHeaders headers = new HttpHeaders();
+            headers.setAccept(Collections.singletonList(MediaType.APPLICATION_JSON));
+            HttpEntity<Void> entity = new HttpEntity<>(headers);
+
+            // 2. Call the external GET API and parse response as JsonNode
+            Map<String, Object> response = restTemplate.exchange(
+                    externalUrl,
+                    HttpMethod.GET,
+                    entity,
+                    Map.class
+            ).getBody();
+
+            List<?> data = (List<?>) response.get("data");
+            if (data.isEmpty()) {
+                shortNoteDao.updateShortNoteField(shortNote.getId(), shortNote.getUserId(), 0);
+            } else if (!data.isEmpty() && shortNote.getAttachement() == null) {
+                shortNoteDao.updateShortNoteField(shortNote.getId(), shortNote.getUserId(), data.size());
+            }
+            shortNoteDto.setNumberOfAttachments(data.size());
+        }
         return new ApiResponse()
                 .success(Boolean.TRUE)
                 .message("Short note fetched successfully")
