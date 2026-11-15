@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -101,7 +102,7 @@ public class DocumentServiceImpl implements DocumentService {
                 response.stream()
                         .map(DmsFileResponse::downloadUrl)
                         .collect(Collectors.toList()),
-                null
+                new ArrayList<>()
         );
     }
 

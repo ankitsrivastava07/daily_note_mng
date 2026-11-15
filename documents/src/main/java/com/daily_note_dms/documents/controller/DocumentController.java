@@ -14,7 +14,6 @@ import java.util.logging.Logger;
 public class DocumentController {
 
     private final DocumentService documentService;
-    private final Logger logger = Logger.getLogger(DocumentController.class.getName());
 
     public DocumentController(DocumentService documentService) {
         this.documentService = documentService;
