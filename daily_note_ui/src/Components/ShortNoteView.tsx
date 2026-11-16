@@ -40,7 +40,7 @@ function ShortNoteView() {
     // ==========================================
     // EFFECT 1: FETCH SHORT NOTE ONLY (ISOLATED)
     // ==========================================
-    let shortNoteResult:any = null;
+    let shortNoteResult = { numberOfAttachments: 0 };
     useEffect(() => {
         const controller = new AbortController();
 
