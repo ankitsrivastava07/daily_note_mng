@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import './App.css';
 import Home from './Components/Home';
@@ -16,58 +17,112 @@ import GetAllTask from './Components/GetAllTask';
 import CameraUploadComponent from './Components/CameraUploadComponent';
 import VideoRecorderComponent from './Components/VideoRecorderComponent';
 import LiveStreamComponent from './Components/LiveStreamComponent';
+import ShortNoteView from './Components/ShortNoteView';
+import ShortNoteUpdate from './Components/ShortNoteUpdate';
 
 function App() {
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
   return (
     <BrowserRouter>
-      {/* Modern Enterprise Header */}
-      <header style={navStyles.header}>
-        <div style={navStyles.logoArea}>
-          <span style={navStyles.logoIcon}>📝</span>
-          <span style={navStyles.logoText}>DailyNotes Studio</span>
+      {/* TCS-Style Corporate Header */}
+      <header style={tcsNavStyles.header} onMouseLeave={() => setActiveDropdown(null)}>
+        <div style={tcsNavStyles.topBar}>
+          {/* Brand Logo & Name */}
+          <Link to="/" style={tcsNavStyles.logoArea}>
+            <span style={tcsNavStyles.logoIcon}>🏢</span>
+            <div style={tcsNavStyles.logoTextGroup}>
+              <span style={tcsNavStyles.logoTitle}>DAILYNOTES</span>
+              <span style={tcsNavStyles.logoSubtitle}>STUDIO ENTERPRISE</span>
+            </div>
+          </Link>
+
+          {/* Main Corporate Navigation Categories */}
+          <nav style={tcsNavStyles.mainNav}>
+            <div
+              style={tcsNavStyles.navItem}
+              onMouseEnter={() => setActiveDropdown('notes')}
+            >
+              <span style={tcsNavStyles.navLinkText}>Notes & Vault <span style={tcsNavStyles.caret}>▾</span></span>
+            </div>
+
+            <div
+              style={tcsNavStyles.navItem}
+              onMouseEnter={() => setActiveDropdown('workspace')}
+            >
+              <span style={tcsNavStyles.navLinkText}>Workspaces & Tasks <span style={tcsNavStyles.caret}>▾</span></span>
+            </div>
+
+            <div
+              style={tcsNavStyles.navItem}
+              onMouseEnter={() => setActiveDropdown('media')}
+            >
+              <span style={tcsNavStyles.navLinkText}>Media & Studios <span style={tcsNavStyles.caret}>▾</span></span>
+            </div>
+
+            <div style={tcsNavStyles.navItem}>
+              <Link to="/about" style={{ ...tcsNavStyles.navLinkText, textDecoration: 'none', color: '#f4f4f5' }}>About</Link>
+            </div>
+
+            <div style={tcsNavStyles.navItem}>
+              <Link to="/contact" style={{ ...tcsNavStyles.navLinkText, textDecoration: 'none', color: '#f4f4f5' }}>Contact</Link>
+            </div>
+          </nav>
         </div>
 
-        <nav style={navStyles.navLinksContainer}>
-          <div style={navStyles.navGroup}>
-            <Link to="/" style={navStyles.link}>Home</Link>
-            <Link to="/create-note" style={navStyles.link}>New Note</Link>
-            <Link to="/all-note" style={navStyles.link}>All Notes</Link>
-            <Link to="/short-note" style={navStyles.link}>Short Note</Link>
-            <Link to="/get-all-short-notes" style={navStyles.link}>Short Notes List</Link>
+        {/* Mega Menu / Dropdown Panel */}
+        {activeDropdown && (
+          <div style={tcsNavStyles.megaMenu} onMouseLeave={() => setActiveDropdown(null)}>
+            <div style={tcsNavStyles.megaMenuContent}>
+              {activeDropdown === 'notes' && (
+                <div style={tcsNavStyles.menuGrid}>
+                  <div style={tcsNavStyles.menuColumn}>
+                    <h4 style={tcsNavStyles.columnHeading}>Core Notes</h4>
+                    <Link to="/" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Home Dashboard</Link>
+                    <Link to="/create-note" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Create New Note</Link>
+                    <Link to="/all-note" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>View All Notes</Link>
+                  </div>
+                  <div style={tcsNavStyles.menuColumn}>
+                    <h4 style={tcsNavStyles.columnHeading}>Short Notes</h4>
+                    <Link to="/short-note" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Create Short Note</Link>
+                    <Link to="/get-all-short-notes" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Short Notes Archive</Link>
+                  </div>
+                </div>
+              )}
+
+              {activeDropdown === 'workspace' && (
+                <div style={tcsNavStyles.menuGrid}>
+                  <div style={tcsNavStyles.menuColumn}>
+                    <h4 style={tcsNavStyles.columnHeading}>Workspaces</h4>
+                    <Link to="/workspace" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Create Workspace</Link>
+                    <Link to="/all-workspace" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>All Workspaces</Link>
+                  </div>
+                  <div style={tcsNavStyles.menuColumn}>
+                    <h4 style={tcsNavStyles.columnHeading}>Task Management</h4>
+                    <Link to="/task" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Task Configuration</Link>
+                    <Link to="/today-task" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Today's Tasks</Link>
+                    <Link to="/get-all-tasks" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>All Assigned Tasks</Link>
+                  </div>
+                </div>
+              )}
+
+              {activeDropdown === 'media' && (
+                <div style={tcsNavStyles.menuGrid}>
+                  <div style={tcsNavStyles.menuColumn}>
+                    <h4 style={tcsNavStyles.columnHeading}>Capture & Stream Studios</h4>
+                    <Link to="/camera-upload" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>📸 Capture & Attach</Link>
+                    <Link to="/video-recorder" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>🎥 Mountain Video Recorder</Link>
+                    <Link to="/live-stream" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>📡 Live Broadcaster Studio</Link>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
-
-          <div style={navStyles.navDivider} />
-
-          <div style={navStyles.navGroup}>
-            <span style={navStyles.groupTitle}>Workspace & Tasks</span>
-            <Link to="/workspace" style={navStyles.link}>New Workspace</Link>
-            <Link to="/all-workspace" style={navStyles.link}>Workspaces</Link>
-            <Link to="/task" style={navStyles.link}>Task</Link>
-            <Link to="/today-task" style={navStyles.link}>Today's Task</Link>
-            <Link to="/get-all-tasks" style={navStyles.link}>All Tasks</Link>
-          </div>
-
-          <div style={navStyles.navDivider} />
-
-          <div style={navStyles.navGroup}>
-            <span style={navStyles.groupTitle}>Media & Studio</span>
-            <Link to="/camera-upload" style={navStyles.link}>📸 Capture</Link>
-            <Link to="/video-recorder" style={navStyles.link}>🎥 Video Recorder</Link>
-            <Link to="/live-stream" style={navStyles.link}>📡 Live Stream</Link>
-          </div>
-
-          <div style={navStyles.navDivider} />
-
-          <div style={navStyles.navGroup}>
-            <span style={navStyles.groupTitle}>General</span>
-            <Link to="/about" style={navStyles.link}>About</Link>
-            <Link to="/contact" style={navStyles.link}>Contact</Link>
-          </div>
-        </nav>
+        )}
       </header>
 
-      {/* App Routes */}
-      <main style={{ padding: '0 24px 24px 24px' }}>
+      {/* Main App Content */}
+      <main style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/workspace" element={<CreateWorkspace onWorkspaceCreated={undefined} />} />
@@ -76,6 +131,8 @@ function App() {
           <Route path="/all-note" element={<GetAllNote />} />
           <Route path="/create-note" element={<DailyNoteForm />} />
           <Route path="/short-note" element={<CreateShortNote />} />
+          <Route path="/short-note/:id" element={<ShortNoteView />} />
+          <Route path="/short-note/:id/update" element={<ShortNoteUpdate />} />
           <Route path="/camera-upload" element={<CameraUploadComponent />} />
           <Route path="/get-all-short-notes" element={<GetAllShortNotes />} />
           <Route path="/all-workspace" element={<AllWorkspace />} />
@@ -91,67 +148,111 @@ function App() {
   );
 }
 
-// Clean Professional Navbar Styles
-const navStyles: Record<string, React.CSSProperties> = {
+// TCS Enterprise Mega Menu Corporate Styles
+const tcsNavStyles: Record<string, React.CSSProperties> = {
   header: {
-    backgroundColor: '#18181b',
-    color: '#f4f4f5',
-    padding: '14px 24px',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px',
+    backgroundColor: '#121214',
+    color: '#ffffff',
+    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
     borderBottom: '1px solid #27272a',
-    marginBottom: '24px',
-    fontFamily: 'Inter, system-ui, sans-serif',
+    position: 'sticky',
+    top: 0,
+    zIndex: 1000,
+  },
+  topBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px 32px',
+    maxWidth: '1400px',
+    margin: '0 auto',
   },
   logoArea: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    fontWeight: 700,
-    fontSize: '16px',
+    gap: '12px',
+    textDecoration: 'none',
     color: '#ffffff',
   },
   logoIcon: {
-    fontSize: '18px',
+    fontSize: '24px',
   },
-  logoText: {
-    letterSpacing: '-0.3px',
-  },
-  navLinksContainer: {
+  logoTextGroup: {
     display: 'flex',
-    flexWrap: 'wrap',
-    alignItems: 'center',
-    gap: '16px',
+    flexDirection: 'column',
   },
-  navGroup: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '8px',
+  logoTitle: {
+    fontWeight: 800,
+    fontSize: '15px',
+    letterSpacing: '1px',
+    color: '#ffffff',
   },
-  groupTitle: {
-    fontSize: '11px',
+  logoSubtitle: {
+    fontSize: '9px',
     fontWeight: 600,
-    textTransform: 'uppercase',
     color: '#71717a',
-    marginRight: '4px',
-    letterSpacing: '0.5px',
+    letterSpacing: '1.5px',
   },
-  navDivider: {
-    width: '1px',
-    height: '20px',
-    backgroundColor: '#27272a',
+  mainNav: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '32px',
   },
-  link: {
-    color: '#d4d4d8',
-    textDecoration: 'none',
+  navItem: {
+    cursor: 'pointer',
+    padding: '8px 0',
+    position: 'relative',
+  },
+  navLinkText: {
+    fontSize: '14px',
+    fontWeight: 600,
+    color: '#e4e4e7',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+  caret: {
+    fontSize: '11px',
+    color: '#a1a1aa',
+  },
+  megaMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    width: '100vw',
+    backgroundColor: '#18181b',
+    borderBottom: '1px solid #27272a',
+    boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
+  },
+  megaMenuContent: {
+    maxWidth: '1200px',
+    margin: '0 auto',
+    padding: '32px 24px',
+  },
+  menuGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+    gap: '32px',
+  },
+  menuColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px',
+  },
+  columnHeading: {
+    fontSize: '12px',
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    color: '#38bdf8',
+    letterSpacing: '1px',
+    marginBottom: '4px',
+  },
+  subLink: {
     fontSize: '13px',
     fontWeight: 500,
-    padding: '4px 8px',
-    borderRadius: '6px',
-    backgroundColor: '#27272a',
-    transition: 'all 0.15s ease',
+    color: '#d4d4d8',
+    textDecoration: 'none',
+    padding: '4px 0',
   },
 };
 

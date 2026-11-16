@@ -520,7 +520,7 @@ function ShortNoteView() {
                         ← Back to Short Notes
                     </Link>
                     <div className="short-note-view-actions">
-                        <Link to={`/short-note/${shortNote.id}/edit`} className="short-note-edit-button">
+                        <Link to={`/short-note/${shortNote.id}/update`} className="short-note-edit-button">
                             ✎ Edit Note
                         </Link>
                     </div>
