@@ -102,17 +102,17 @@
             <artifactId>dynamodb-enhanced</artifactId>
         </dependency>
 
-        <!-- AWS S3 -->
+       <!-- &lt;!&ndash; AWS S3 &ndash;&gt;
         <dependency>
             <groupId>io.awspring.cloud</groupId>
             <artifactId>spring-cloud-aws-starter-s3</artifactId>
-        </dependency>
+        </dependency>-->
 
-        <!-- AWS Secrets Manager -->
-        <dependency>
-            <groupId>io.awspring.cloud</groupId>
-            <artifactId>spring-cloud-aws-starter-secrets-manager</artifactId>
-        </dependency>
+        <!--  &lt;!&ndash; AWS Secrets Manager &ndash;&gt;
+          <dependency>
+              <groupId>io.awspring.cloud</groupId>
+              <artifactId>spring-cloud-aws-starter-secrets-manager</artifactId>
+          </dependency>-->
 
         <!-- Resilience4j -->
         <dependency>

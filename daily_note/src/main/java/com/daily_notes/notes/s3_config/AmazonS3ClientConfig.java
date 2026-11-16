@@ -1,3 +1,4 @@
+/*
 package com.daily_notes.notes.s3_config;
 
 import org.springframework.context.annotation.Bean;
@@ -13,3 +14,4 @@ public class AmazonS3ClientConfig {
     }
 
 }
+*/
