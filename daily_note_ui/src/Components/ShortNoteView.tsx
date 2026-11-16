@@ -40,6 +40,7 @@ function ShortNoteView() {
     // ==========================================
     // EFFECT 1: FETCH SHORT NOTE ONLY (ISOLATED)
     // ==========================================
+    let shortNoteResult = { numberOfAttachments: 0 };
     useEffect(() => {
         const controller = new AbortController();
 
@@ -79,6 +80,7 @@ function ShortNoteView() {
                 }
 
                 const noteResult = await noteResponse.json();
+                shortNoteResult = noteResult.data
 
                 if (!noteResult.success || !noteResult.data) {
                     throw new Error(
@@ -121,86 +123,88 @@ function ShortNoteView() {
         const fetchAttachments = async () => {
             try {
                 setAttachmentLoading(true);
-                setAttachmentError("");
+                if (shortNoteResult.numberOfAttachments > 0) {
+                    setAttachmentError("");
 
-                const userId = localStorage.getItem("userId") || DEFAULT_USER_ID;
-                const dmsUrl = `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(shortNote.id)}/dms`;
+                    const userId = localStorage.getItem("userId") || DEFAULT_USER_ID;
+                    const dmsUrl = `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(shortNote.id)}/dms`;
 
-                // Minimum 5-second timer for professional loader feel
-                const minTimerPromise = new Promise((resolve) => setTimeout(resolve, 5000));
+                    // Minimum 5-second timer for professional loader feel
+                    const minTimerPromise = new Promise((resolve) => setTimeout(resolve, 5000));
 
-                const dmsPromise = fetch(dmsUrl, {
-                    method: "GET",
-                    headers: {
-                        userid: userId,
-                        Accept: "application/json"
-                    },
-                    signal: controller.signal
-                });
+                    const dmsPromise = fetch(dmsUrl, {
+                        method: "GET",
+                        headers: {
+                            userid: userId,
+                            Accept: "application/json"
+                        },
+                        signal: controller.signal
+                    });
 
-                const [dmsResponse] = await Promise.all([dmsPromise, minTimerPromise]);
+                    const [dmsResponse] = await Promise.all([dmsPromise, minTimerPromise]);
 
-                if (!dmsResponse.ok) {
-                    throw new Error(
-                        (await dmsResponse.text()) ||
-                        `DMS API failed: ${dmsResponse.status}`
-                    );
-                }
+                    if (!dmsResponse.ok) {
+                        throw new Error(
+                            (await dmsResponse.text()) ||
+                            `DMS API failed: ${dmsResponse.status}`
+                        );
+                    }
 
-                const dmsResult = await dmsResponse.json();
+                    const dmsResult = await dmsResponse.json();
 
-                if (dmsResult.success === false) {
-                    throw new Error(dmsResult.message || "DMS retrieval failed.");
-                }
+                    if (dmsResult.success === false) {
+                        throw new Error(dmsResult.message || "DMS retrieval failed.");
+                    }
 
-                const files = Array.isArray(dmsResult.data)
-                    ? dmsResult.data
-                    : Array.isArray(dmsResult.data?.files)
-                        ? dmsResult.data.files
-                        : [];
+                    const files = Array.isArray(dmsResult.data)
+                        ? dmsResult.data
+                        : Array.isArray(dmsResult.data?.files)
+                            ? dmsResult.data.files
+                            : [];
 
-                const attachments: Attachment[] = files
-                    .map((file: any, index: number) => {
-                        const downloadUrl =
-                            typeof file === "string"
-                                ? file
-                                : file.downloadUrl ||
-                                  file.presignedUrl ||
-                                  file.url;
+                    const attachments: Attachment[] = files
+                        .map((file: any, index: number) => {
+                            const downloadUrl =
+                                typeof file === "string"
+                                    ? file
+                                    : file.downloadUrl ||
+                                    file.presignedUrl ||
+                                    file.url;
 
-                        if (
-                            typeof downloadUrl !== "string" ||
-                            !downloadUrl.startsWith("https://")
-                        ) {
-                            return null;
-                        }
+                            if (
+                                typeof downloadUrl !== "string" ||
+                                !downloadUrl.startsWith("https://")
+                            ) {
+                                return null;
+                            }
 
-                        let fileName =
-                            typeof file === "object" && file !== null
-                                ? file.fileName ||
-                                  file.originalFileName ||
-                                  file.name
-                                : null;
-
-                        if (!fileName) {
-                            fileName = thisGetFileName(downloadUrl, index);
-                        }
-
-                        return {
-                            fileName,
-                            downloadUrl,
-                            contentType:
+                            let fileName =
                                 typeof file === "object" && file !== null
-                                    ? file.contentType || file.mimeType || ""
-                                    : ""
-                        };
-                    })
-                    .filter((file: Attachment | null): file is Attachment => file !== null);
+                                    ? file.fileName ||
+                                    file.originalFileName ||
+                                    file.name
+                                    : null;
 
-                if (!controller.signal.aborted) {
-                    setShortNote((prev) =>
-                        prev ? { ...prev, downloadUrl: attachments } : null
-                    );
+                            if (!fileName) {
+                                fileName = thisGetFileName(downloadUrl, index);
+                            }
+
+                            return {
+                                fileName,
+                                downloadUrl,
+                                contentType:
+                                    typeof file === "object" && file !== null
+                                        ? file.contentType || file.mimeType || ""
+                                        : ""
+                            };
+                        })
+                        .filter((file: Attachment | null): file is Attachment => file !== null);
+
+                    if (!controller.signal.aborted) {
+                        setShortNote((prev) =>
+                            prev ? { ...prev, downloadUrl: attachments } : null
+                        );
+                    }
                 }
             } catch (dmsError: any) {
                 if (dmsError.name !== "AbortError") {

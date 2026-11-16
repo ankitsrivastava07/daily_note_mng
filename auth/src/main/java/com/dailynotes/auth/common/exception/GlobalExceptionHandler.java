@@ -1,4 +1,4 @@
-package com.dailynotes.auth.exception;
+package com.dailynotes.auth.common.exception;
 
 public class GlobalExceptionHandler {
 }
