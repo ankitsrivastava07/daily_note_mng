@@ -63,8 +63,11 @@ public class ShortNoteController {
         if (page.lastEvaluatedKey() != null && !page.lastEvaluatedKey().isEmpty()) {
             Map<String, String> serializableKey = new HashMap<>();
             for (Map.Entry<String, AttributeValue> entry : page.lastEvaluatedKey().entrySet()) {
-                if (entry.getValue().s() != null) {
-                    serializableKey.put(entry.getKey(), entry.getValue().s());
+                AttributeValue val = entry.getValue();
+                if (val.s() != null) {
+                    serializableKey.put(entry.getKey(), val.s());
+                } else if (val.n() != null) {
+                    serializableKey.put(entry.getKey(), val.n()); // Number type support
                 }
             }
             result.put("lastEvaluatedKey", serializableKey);
