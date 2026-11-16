@@ -45,11 +45,9 @@ jobs:
 
       # 3. Build Spring Boot application
       - name: Build Spring Boot application
-        working-directory: daily_note
         run: |
-          chmod +x mvnw
+          chmod +x ./mvnw
           ./mvnw clean package -DskipTests
-          # Yeh check karne ke liye ki jar bani ya nahi:
           ls -la target/
 
       # 4. Configure AWS credentials
