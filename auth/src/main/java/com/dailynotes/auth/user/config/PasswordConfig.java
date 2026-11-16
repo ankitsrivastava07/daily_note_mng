@@ -1,4 +1,4 @@
-package com.dailynotes.auth.config;
+package com.dailynotes.auth.user.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

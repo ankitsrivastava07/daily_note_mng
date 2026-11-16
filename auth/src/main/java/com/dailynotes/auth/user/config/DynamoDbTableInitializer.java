@@ -1,4 +1,4 @@
-package com.dailynotes.auth.config;
+package com.dailynotes.auth.user.config;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
@@ -7,8 +7,6 @@ import org.springframework.stereotype.Component;
 
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
-
-import java.util.List;
 
 @Component
 public class DynamoDbTableInitializer implements ApplicationRunner {
