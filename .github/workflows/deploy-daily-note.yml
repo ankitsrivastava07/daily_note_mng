@@ -100,7 +100,7 @@ jobs:
             --sbom=false \
             --output "type=image,name=$ECR_REGISTRY/dailynote:$IMAGE_TAG,push=true,oci-mediatypes=false,compression=gzip" \
             -f daily_note/Dockerfile \
-            daily_note
+            .
 
       # 9. Verify ECR image manifest
       - name: Verify ECR image manifest
