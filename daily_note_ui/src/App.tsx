@@ -29,7 +29,6 @@ function App() {
 
         <nav style={navStyles.navLinksContainer}>
           <div style={navStyles.navGroup}>
-            <span style={navStyles.groupTitle}>Notes</span>
             <Link to="/" style={navStyles.link}>Home</Link>
             <Link to="/create-note" style={navStyles.link}>New Note</Link>
             <Link to="/all-note" style={navStyles.link}>All Notes</Link>
