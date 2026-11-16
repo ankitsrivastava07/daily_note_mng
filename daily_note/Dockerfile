@@ -1,4 +1,3 @@
-
 # Lightweight Java 17 runtime
 FROM eclipse-temurin:17-jre
 
@@ -9,7 +8,7 @@ COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 \
     /lambda-adapter /opt/extensions/lambda-adapter
 
 # Copy Spring Boot executable JAR
-COPY target/*.jar app.jar
+COPY COPY daily_note/target/*.jar app.jar 
 
 EXPOSE 9091
 
