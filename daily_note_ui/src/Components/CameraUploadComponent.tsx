@@ -1,86 +1,1168 @@
-import React, { useState } from 'react';
 
-const CameraUploadComponent = () => {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+import { useEffect, useRef, useState } from "react";
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setPreview(URL.createObjectURL(file));
-    }
-  };
+const USER_ID = "ankit0397";
+const MAX_FILES = 3;
 
-  const handleUpload = async () => {
-    if (!selectedFile) return;
-    setLoading(true);
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const DMS_API_BASE_URL = import.meta.env.VITE_DMS_API_BASE_URL;
 
-    try {
-      const referenceId = "note_123";
-
-      const res = await fetch(`/api/v1/documents/presigned-url?referenceId=${referenceId}&fileNames=${encodeURIComponent(selectedFile.name)}`);
-      const data = await res.json();
-      const uploadUrl = data.data[0];
-
-      await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': selectedFile.type,
-        },
-        body: selectedFile,
-      });
-
-      alert('Photo uploaded successfully to S3!');
-      setSelectedFile(null);
-      setPreview(null);
-    } catch (err) {
-      console.error('Upload failed:', err);
-      alert('Failed to upload photo.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div style={{ padding: '20px', maxWidth: '400px', margin: '20px auto', background: '#fff', borderRadius: '8px', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
-      <h3>Attach Photo to Note</h3>
-
-      {preview && (
-        <div style={{ position: 'relative', width: '100%', height: '200px', marginBottom: '15px' }}>
-          <img src={preview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '6px' }} />
-          <button
-            onClick={() => { setSelectedFile(null); setPreview(null); }}
-            style={{ position: 'absolute', top: '10px', right: '10px', background: 'red', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer' }}
-          >
-            ✕
-          </button>
-        </div>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <label style={{ cursor: 'pointer', background: '#f0f0f0', padding: '8px 12px', borderRadius: '4px', border: '1px solid #ccc' }}>
-          📸 Open Camera / Gallery
-          <input
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleFileChange}
-            style={{ display: 'none' }}
-          />
-        </label>
-
-        <button
-          onClick={handleUpload}
-          disabled={loading || !selectedFile}
-          style={{ background: '#007bff', color: 'white', border: 'none', padding: '8px 16px', borderRadius: '4px', cursor: 'pointer' }}
-        >
-          {loading ? 'Uploading...' : 'Upload'}
-        </button>
-      </div>
-    </div>
-  );
+const categoryLabels = {
+    general: "General Interview",
+    interview: "Interview",
+    qbank: "Question Bank",
+    facebook: "Facebook",
+    instagram: "Instagram",
+    whatsapp: "WhatsApp",
+    others: "Others"
 };
 
-export default CameraUploadComponent;
+function CreateShortNote() {
+    const [inputValue, setInputValue] = useState({
+        title: "",
+        content: "",
+        categoryId: "others",
+        userId: USER_ID
+    });
+
+    const [files, setFiles] = useState([]);
+    const [isSuccess, setIsSuccess] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState("");
+    const [formErrors, setFormErrors] = useState({});
+    const [apiError, setApiError] = useState("");
+    const [savedAttachmentCount, setSavedAttachmentCount] = useState(0);
+    const [cameraOpen, setCameraOpen] = useState(false);
+    const [cameraError, setCameraError] = useState("");
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+    const fileInputRef = useRef(null);
+    const liveCameraRef = useRef(null);
+    const cameraStreamRef = useRef(null);
+    const mediaRecorderRef = useRef(null);
+    const recordingChunksRef = useRef([]);
+    const textareaRef = useRef(null);
+    const pendingSubmissionRef = useRef(null);
+    const filesRef = useRef(files);
+
+    useEffect(() => {
+        filesRef.current = files;
+    }, [files]);
+
+    // Attach the active camera stream to the live preview.
+    useEffect(() => {
+        if (cameraOpen && liveCameraRef.current && cameraStreamRef.current) {
+            liveCameraRef.current.srcObject = cameraStreamRef.current;
+            liveCameraRef.current.play().catch(error => {
+                console.error("Camera preview playback failed:", error);
+            });
+        }
+    }, [cameraOpen]);
+
+    // Always release the camera when this component unmounts.
+    useEffect(() => {
+        return () => {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                mediaRecorderRef.current.stop();
+            }
+            cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+            cameraStreamRef.current = null;
+        };
+    }, []);
+
+    // Clear success message
+    useEffect(() => {
+        if (isSuccess !== true) return;
+
+        const timer = setTimeout(() => {
+            setIsSuccess(null);
+        }, 3000);
+
+        return () => clearTimeout(timer);
+    }, [isSuccess]);
+
+    // Cleanup remaining image previews only when the component unmounts.
+    useEffect(() => {
+        return () => {
+            filesRef.current.forEach(item => {
+                if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+            });
+        };
+    }, []);
+
+    // Handle form inputs
+    const handleInputValue = (e) => {
+        const { name, value } = e.target;
+
+        setInputValue(prev => ({
+            ...prev,
+            [name]: value
+        }));
+
+        setFormErrors(prev => ({
+            ...prev,
+            [name]: ""
+        }));
+    };
+
+    // Ctrl+B formatting
+    const handleKeyDown = (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+            e.preventDefault();
+
+            const textarea = e.target;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const currentValue = textarea.value;
+            const selectedText = currentValue.substring(start, end);
+
+            let newValue;
+            let newStart = start;
+            let newEnd = end;
+
+            if (
+                selectedText.startsWith("**") &&
+                selectedText.endsWith("**")
+            ) {
+                newValue =
+                    currentValue.substring(0, start) +
+                    selectedText.slice(2, -2) +
+                    currentValue.substring(end);
+
+                newEnd = end - 4;
+            } else {
+                newValue =
+                    currentValue.substring(0, start) +
+                    `**${selectedText}**` +
+                    currentValue.substring(end);
+
+                if (selectedText.length === 0) {
+                    newStart = start + 2;
+                    newEnd = start + 2;
+                } else {
+                    newEnd = end + 4;
+                }
+            }
+
+            setInputValue(prev => ({
+                ...prev,
+                content: newValue
+            }));
+
+            requestAnimationFrame(() => {
+                textarea.focus();
+                textarea.setSelectionRange(newStart, newEnd);
+            });
+        }
+    };
+
+    // Category selection
+    const handleCategorySelect = (categoryKey) => {
+        setInputValue(prev => ({
+            ...prev,
+            categoryId: categoryKey
+        }));
+
+        setFormErrors(prev => ({
+            ...prev,
+            categoryId: ""
+        }));
+    };
+
+    // Add attachments
+    const addFiles = (incomingFiles) => {
+        const validFiles = Array.from(incomingFiles || []);
+
+        if (!validFiles.length) return;
+
+        setFiles(previous => {
+            const remaining = MAX_FILES - previous.length;
+
+            if (remaining <= 0) {
+                setApiError("Maximum 3 attachments are allowed.");
+                return previous;
+            }
+
+            const accepted = validFiles.slice(0, remaining);
+
+            const newFiles = accepted.map(file => ({
+                file,
+                id: `${Date.now()}-${Math.random()}`,
+                previewUrl: file.type.startsWith("image/") || file.type.startsWith("video/")
+                    ? URL.createObjectURL(file)
+                    : null
+            }));
+
+            setApiError(
+                accepted.length < validFiles.length
+                    ? "Maximum 3 attachments are allowed."
+                    : ""
+            );
+
+            return [...previous, ...newFiles];
+        });
+    };
+
+    // File selection
+    const handleFileSelect = (e) => {
+        addFiles(e.target.files);
+        e.target.value = "";
+    };
+
+    // Open the laptop webcam or mobile device camera inside the browser.
+    const openLiveCamera = async () => {
+        try {
+            setCameraError("");
+            setApiError("");
+
+            if (!navigator.mediaDevices?.getUserMedia) {
+                setCameraError("Camera access requires HTTPS or localhost and a supported browser.");
+                return;
+            }
+
+            // Stop any previously active stream before opening a new one.
+            cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+
+            const videoConstraints = {
+                facingMode: { ideal: "environment" },
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            };
+
+            // Prefer camera + microphone for recording. If microphone access is
+            // unavailable, fall back to a video-only stream so live preview still works.
+            let stream;
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: videoConstraints,
+                    audio: true
+                });
+            } catch (audioError) {
+                console.warn("Camera/microphone request failed; retrying camera only:", audioError);
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: videoConstraints,
+                    audio: false
+                });
+            }
+
+            cameraStreamRef.current = stream;
+            setCameraOpen(true);
+        } catch (error) {
+            console.error("Camera access failed:", error);
+            const cameraException = error instanceof Error ? error : new Error("Unable to access camera.");
+
+            if (cameraException.name === "NotAllowedError") {
+                setCameraError("Camera permission denied. Please allow camera access in your browser settings.");
+            } else if (cameraException.name === "NotFoundError") {
+                setCameraError("No camera was found on this device.");
+            } else if (cameraException.name === "NotReadableError") {
+                setCameraError("The camera is already being used by another application.");
+            } else {
+                setCameraError(cameraException.message || "Unable to open camera.");
+            }
+        }
+    };
+
+    // Capture a still photo from the live camera preview and add it to attachments.
+    const captureLivePhoto = () => {
+        const video = liveCameraRef.current;
+
+        if (!video || !video.videoWidth || !video.videoHeight) {
+            setCameraError("Camera is not ready yet. Please try again.");
+            return;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+            setCameraError("Unable to capture photo.");
+            return;
+        }
+
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(blob => {
+            if (!blob) {
+                setCameraError("Photo capture failed. Please try again.");
+                return;
+            }
+
+            const photo = new File(
+                [blob],
+                `camera-photo-${Date.now()}.jpg`,
+                { type: "image/jpeg" }
+            );
+            addFiles([photo]);
+            closeLiveCamera();
+        }, "image/jpeg", 0.9);
+    };
+
+    // Start recording the active live camera stream and add the result as an attachment.
+    const startVideoRecording = () => {
+        if (!cameraStreamRef.current) {
+            setCameraError("Open the camera before starting video recording.");
+            return;
+        }
+
+        if (files.length >= MAX_FILES) {
+            setCameraError("Maximum 3 attachments are allowed.");
+            return;
+        }
+
+        if (!window.MediaRecorder) {
+            setCameraError("Video recording is not supported by this browser.");
+            return;
+        }
+
+        try {
+            const supportedTypes = [
+                "video/webm;codecs=vp9,opus",
+                "video/webm;codecs=vp8,opus",
+                "video/webm",
+                "video/mp4"
+            ];
+            const mimeType = supportedTypes.find(type => MediaRecorder.isTypeSupported(type));
+            const recorder = mimeType
+                ? new MediaRecorder(cameraStreamRef.current, { mimeType })
+                : new MediaRecorder(cameraStreamRef.current);
+
+            recordingChunksRef.current = [];
+            recorder.ondataavailable = event => {
+                if (event.data && event.data.size > 0) {
+                    recordingChunksRef.current.push(event.data);
+                }
+            };
+
+            recorder.onerror = event => {
+                console.error("Video recording failed:", event);
+                setCameraError("Video recording failed. Please try again.");
+                setIsRecording(false);
+            };
+
+            recorder.onstop = () => {
+                const type = recorder.mimeType || "video/webm";
+                const extension = type.includes("mp4") ? "mp4" : "webm";
+                const blob = new Blob(recordingChunksRef.current, { type });
+
+                if (blob.size > 0) {
+                    const recordedVideo = new File(
+                        [blob],
+                        `camera-video-${Date.now()}.${extension}`,
+                        { type }
+                    );
+                    addFiles([recordedVideo]);
+                } else {
+                    setCameraError("The video recording is empty. Please try again.");
+                }
+
+                recordingChunksRef.current = [];
+                setIsRecording(false);
+                setRecordingSeconds(0);
+                mediaRecorderRef.current = null;
+                closeLiveCamera();
+            };
+
+            mediaRecorderRef.current = recorder;
+            recorder.start(1000);
+            setRecordingSeconds(0);
+            setIsRecording(true);
+            setCameraError("");
+        } catch (error) {
+            console.error("Unable to start video recording:", error);
+            setCameraError(error.message || "Unable to start video recording.");
+        }
+    };
+
+    // Stop recording; onstop creates a video attachment.
+    const stopVideoRecording = () => {
+        const recorder = mediaRecorderRef.current;
+        if (recorder && recorder.state !== "inactive") {
+            recorder.stop();
+        }
+    };
+
+    // Keep a simple recording timer visible in the camera controls.
+    useEffect(() => {
+        if (!isRecording) return undefined;
+        const timer = window.setInterval(() => {
+            setRecordingSeconds(seconds => seconds + 1);
+        }, 1000);
+        return () => window.clearInterval(timer);
+    }, [isRecording]);
+
+    // Stop the camera and release the device.
+    const closeLiveCamera = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            mediaRecorderRef.current.stop();
+            return;
+        }
+        cameraStreamRef.current?.getTracks().forEach(track => track.stop());
+        cameraStreamRef.current = null;
+
+        if (liveCameraRef.current) {
+            liveCameraRef.current.srcObject = null;
+        }
+
+        setCameraOpen(false);
+    };
+
+    // Paste images using Ctrl+V
+    const handlePaste = (e) => {
+        const items = e.clipboardData?.items;
+
+        if (!items) return;
+
+        const pastedImages = [];
+
+        for (const item of items) {
+            if (item.type.startsWith("image/")) {
+                const file = item.getAsFile();
+
+                if (file) {
+                    const extension =
+                        file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+
+                    pastedImages.push(
+                        new File(
+                            [file],
+                            `pasted-image-${Date.now()}.${extension}`,
+                            { type: file.type }
+                        )
+                    );
+                }
+            }
+        }
+
+        if (pastedImages.length > 0) {
+            e.preventDefault();
+            addFiles(pastedImages);
+        }
+    };
+
+    // Remove attachment
+    const removeFile = (id) => {
+        setFiles(previous => {
+            const selected = previous.find(item => item.id === id);
+
+            if (selected?.previewUrl) {
+                URL.revokeObjectURL(selected.previewUrl);
+            }
+
+            const updated = previous.filter(item => item.id !== id);
+            filesRef.current = updated;
+            return updated;
+        });
+    };
+
+    // Read API response
+    const readResponse = async (response) => {
+        const data = await response.json().catch(() => ({}));
+
+        if (
+            !response.ok ||
+            data.success === false ||
+            data.status === false
+        ) {
+            throw new Error(
+                data.message || `Request failed (${response.status})`
+            );
+        }
+
+        return data;
+    };
+
+    // referenceId must be the Short Note database ID only.
+    // Never fall back to uniqueToken or another field.
+    const extractReferenceId = (response) => {
+        const id = response?.data?.id;
+
+        if (id === null || id === undefined) {
+            return " ";
+        }
+
+        const referenceId = String(id).trim();
+        return referenceId.length > 0 ? referenceId : null;
+    };
+
+    // API 1: Create Short Note
+    const createShortNote = async (notePayload) => {
+        const response = await fetch(
+            `${API_BASE_URL}/api/v1/short-note`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    userId: USER_ID
+                },
+                body: JSON.stringify(notePayload)
+            }
+        );
+
+        return await readResponse(response);
+    };
+
+    // API 2: Generate DMS presigned URLs
+    const generatePresignedUrls = async (referenceId, submittedFiles) => {
+        const params = new URLSearchParams();
+
+        submittedFiles.forEach(item => {
+            params.append("fileName", item.file.name);
+        });
+
+        const response = await fetch(
+            `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(referenceId)}/dms/presigned?${params.toString()}`,
+            {
+                method: "GET",
+                headers: {
+                    userId: USER_ID
+                }
+            }
+        );
+
+        const result = await readResponse(response);
+        const urls = result.data;
+
+        if (!Array.isArray(urls) || urls.length !== submittedFiles.length) {
+            throw new Error(
+                "DMS did not return the expected number of presigned URLs."
+            );
+        }
+
+        return urls;
+    };
+
+    // API 3: Upload directly to S3
+    const uploadFilesToS3 = async (urls, submittedFiles) => {
+        for (let i = 0; i < submittedFiles.length; i++) {
+            const item = submittedFiles[i];
+            const file = item.file;
+
+            setUploadProgress(
+                `Uploading ${i + 1} of ${submittedFiles.length}: ${file.name}`
+            );
+
+            const response = await fetch(urls[i], {
+                method: "PUT",
+                headers: {
+                    "Content-Type": file.type || "application/octet-stream"
+                },
+                body: file
+            });
+
+            if (!response.ok) {
+                throw new Error(
+                    `S3 upload failed for ${file.name} (${response.status})`
+                );
+            }
+        }
+    };
+
+    // API 4: Save DMS metadata
+    const saveDocumentMetadata = async (referenceId, submittedFiles) => {
+        const documentDtos = submittedFiles.map(item => ({
+            fileName: item.file.name,
+            fileSize: item.file.size,
+            contentType: item.file.type || "application/octet-stream",
+            userId: USER_ID
+        }));
+
+        const response = await fetch(
+            `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(referenceId)}/dms`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    userId: USER_ID
+                },
+                body: JSON.stringify(documentDtos)
+            }
+        );
+
+        await readResponse(response);
+    };
+
+    // Form validation
+    const validate = () => {
+        const errors = {};
+
+        if (!inputValue.title.trim()) {
+            errors.title = "Title is required";
+        }
+
+        if (!inputValue.content.trim()) {
+            errors.content = "Content is required";
+        }
+
+        if (!inputValue.categoryId) {
+            errors.categoryId = "Please select a valid category";
+        }
+
+        if (files.length > MAX_FILES) {
+            errors.files = "Maximum 3 attachments are allowed.";
+        }
+
+        setFormErrors(errors);
+
+        return Object.keys(errors).length === 0;
+    };
+
+    // Submit Short Note
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+
+        if (isLoading) return;
+
+        if (!validate()) {
+            setIsSuccess(null);
+            return;
+        }
+
+        if (!API_BASE_URL) {
+            setApiError("VITE_API_BASE_URL is not configured.");
+            setIsSuccess(false);
+            return;
+        }
+
+        if (files.length > 0 && !DMS_API_BASE_URL) {
+            console.log("DMS API base URL is not configured.", DMS_API_BASE_URL + " --- IGNORE --- " + files.length);
+            setApiError("VITE_DMS_API_BASE_URL is not configured.");
+            setIsSuccess(false);
+            return;
+        }
+
+        // Use a stable snapshot so the same files are used throughout this request.
+        const submittedFiles = [...files];
+        const submittedFileCount = submittedFiles.length;
+        const notePayload = { ...inputValue,
+            attachment: submittedFileCount
+         };
+        const submissionSignature = JSON.stringify({
+            note: notePayload,
+            files: submittedFiles.map(({ file }) => ({
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                lastModified: file.lastModified
+            }))
+        });
+
+        setIsLoading(true);
+        setIsSuccess(null);
+        setSavedAttachmentCount(0);
+        setApiError("");
+        setUploadProgress("");
+
+        let noteCreated = false;
+
+        try {
+            // Reuse the created note when retrying the same failed submission.
+            let pendingSubmission = pendingSubmissionRef.current;
+
+            if (!pendingSubmission ||
+                pendingSubmission.signature !== submissionSignature) {
+                setUploadProgress("Saving short note...");
+
+                const noteResponse = await createShortNote(notePayload);
+                pendingSubmission = {
+                    signature: submissionSignature,
+                    noteResponse
+                };
+                pendingSubmissionRef.current = pendingSubmission;
+            }
+
+            noteCreated = true;
+
+            if (submittedFileCount > 0) {
+                const referenceId = extractReferenceId(
+                    pendingSubmission.noteResponse
+                );
+
+                // Do not stop the UI flow when the API response has a null ID.
+                // The DMS backend still needs a valid referenceId to process files.
+                const dmsReferenceId = referenceId || "";
+
+                setUploadProgress("Generating document upload URLs...");
+                const urls = await generatePresignedUrls(
+                    dmsReferenceId,
+                    submittedFiles
+                );
+
+                // All S3 uploads must succeed before metadata is saved.
+                await uploadFilesToS3(urls, submittedFiles);
+
+                setUploadProgress("Saving document information...");
+                await saveDocumentMetadata(dmsReferenceId, submittedFiles);
+            }
+
+            // Show success only after every required step has completed.
+            setSavedAttachmentCount(submittedFileCount);
+            setIsSuccess(true);
+            setApiError("");
+
+            setInputValue({
+                title: "",
+                content: "",
+                categoryId: "others",
+                userId: USER_ID
+            });
+
+            submittedFiles.forEach(item => {
+                if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+            });
+
+            filesRef.current = [];
+            setFiles([]);
+            setFormErrors({});
+            pendingSubmissionRef.current = null;
+
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
+
+        } catch (error) {
+            console.error("Short Note / DMS error:", error);
+            setIsSuccess(false);
+
+            setApiError(
+                noteCreated
+                    ? `Short note was created, but attachment processing did not complete: ${error.message}. Your form and attachments are still available. Submit again to retry.`
+                    : error.message || "Unable to save the short note. Please try again."
+            );
+        } finally {
+            setIsLoading(false);
+            setUploadProgress("");
+        }
+    };
+
+    return (
+        <>
+            <style>{`
+                .main-card {
+                    transition: all 0.3s ease;
+                }
+
+                .main-card:hover {
+                    box-shadow: 0 1rem 3rem rgba(0,0,0,.12) !important;
+                }
+
+                .custom-dropdown-btn:hover {
+                    background-color: #e9ecef !important;
+                    border-color: #adb5bd !important;
+                    color: #0d6efd !important;
+                }
+
+                .dropdown-menu .dropdown-item:hover {
+                    background-color: #0d6efd !important;
+                    color: white !important;
+                    padding-left: 1.25rem !important;
+                    transition: all 0.15s ease-in-out;
+                }
+
+                .custom-submit-btn {
+                    transition: all 0.2s ease-in-out;
+                }
+
+                .custom-submit-btn:hover:not(:disabled) {
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 15px rgba(13, 110, 253, 0.3) !important;
+                    background-color: #0b5ed7 !important;
+                }
+
+                .custom-submit-btn:disabled {
+                    opacity: 0.7;
+                    cursor: not-allowed;
+                }
+
+                .form-control:focus {
+                    border-color: #0d6efd;
+                    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+                }
+
+                .attachment-card {
+                    position: relative;
+                    border: 1px solid #dee2e6;
+                    border-radius: 10px;
+                    padding: 10px;
+                    background: #f8f9fa;
+                    min-width: 0;
+                }
+
+                .attachment-preview {
+                    width: 100%;
+                    height: 120px;
+                    object-fit: contain;
+                    border-radius: 6px;
+                    background: white;
+                }
+
+                .attachment-remove {
+                    position: absolute;
+                    top: 5px;
+                    right: 5px;
+                    border: none;
+                    background: #dc3545;
+                    color: white;
+                    width: 25px;
+                    height: 25px;
+                    border-radius: 50%;
+                    cursor: pointer;
+                }
+            `}</style>
+
+            <div className="container my-4" style={{ maxWidth: "800px" }}>
+                <div className="card main-card shadow-sm border-0 p-4 rounded-4 bg-white">
+
+                    <h2 className="mb-4 text-primary fw-bold">
+                        Create Short Note
+                    </h2>
+
+                    <form onSubmit={handleSubmit} onPaste={handlePaste}>
+
+                        {/* Category */}
+                        <div className="mb-3">
+                            <label className="form-label fw-semibold text-secondary small text-uppercase">
+                                Category
+                            </label>
+
+                            <div className="dropdown">
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-secondary custom-dropdown-btn dropdown-toggle d-flex justify-content-between align-items-center"
+                                    data-bs-toggle="dropdown"
+                                    data-bs-auto-close="outside"
+                                    style={{ width: "220px" }}
+                                    disabled={isLoading}
+                                >
+                                    {categoryLabels[inputValue.categoryId]}
+                                </button>
+
+                                <ul className="dropdown-menu shadow border-0 py-2 rounded-3">
+                                    {Object.entries(categoryLabels).map(
+                                        ([key, label]) => (
+                                            <li key={key}>
+                                                <button
+                                                    type="button"
+                                                    className="dropdown-item py-2 px-3"
+                                                    disabled={isLoading}
+                                                    onClick={() => handleCategorySelect(key)}
+                                                >
+                                                    {label}
+                                                </button>
+                                            </li>
+                                        )
+                                    )}
+                                </ul>
+                            </div>
+
+                            {formErrors.categoryId && (
+                                <div className="text-danger mt-1 small">
+                                    {formErrors.categoryId}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Note title */}
+                        <div className="mb-3">
+                            <label className="form-label fw-semibold text-secondary small text-uppercase">
+                                Note Name
+                            </label>
+
+                            <input
+                                type="text"
+                                name="title"
+                                value={inputValue.title}
+                                onChange={handleInputValue}
+                                className="form-control py-2 shadow-none"
+                                placeholder="Short Note Name"
+                                disabled={isLoading}
+                            />
+
+                            {formErrors.title && (
+                                <div className="text-danger mt-1 small">
+                                    {formErrors.title}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Description */}
+                        <div className="mb-3">
+                            <div className="d-flex justify-content-between align-items-center mb-1">
+                                <label className="form-label fw-semibold text-secondary small text-uppercase">
+                                    Description
+                                </label>
+
+                       
+                            </div>
+
+                            <textarea
+                                ref={textareaRef}
+                                name="content"
+                                value={inputValue.content}
+                                className="form-control note-textarea shadow-none"
+                                onChange={handleInputValue}
+                                onKeyDown={handleKeyDown}
+                                rows={10}
+                                placeholder="Description (you can also paste images using Ctrl + V)"
+                                disabled={isLoading}
+                                style={{
+                                    fontFamily: "monospace",
+                                    fontSize: "14px"
+                                }}
+                            />
+
+                            {formErrors.content && (
+                                <div className="text-danger mt-1 small">
+                                    {formErrors.content}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Attachments */}
+                        <div className="mb-3">
+                            <div className="d-flex justify-content-between align-items-center mb-2">
+                                <label className="form-label fw-semibold text-secondary small text-uppercase mb-0">
+                                    Document Attachments
+                                </label>
+
+                                <small className="text-muted">
+                                    {files.length}/{MAX_FILES} files
+                                </small>
+                            </div>
+
+                            <div className="border rounded-3 p-3 bg-light">
+                                <div className="d-flex flex-wrap align-items-center gap-2">
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-primary"
+                                        disabled={isLoading || files.length >= MAX_FILES || cameraOpen}
+                                        onClick={openLiveCamera}
+                                    >
+                                        <i className="bi bi-camera me-2"></i>
+                                        Open Camera
+                                    </button>
+
+                                    <button
+                                        type="button"
+                                        className="btn btn-outline-secondary"
+                                        disabled={isLoading || files.length >= MAX_FILES}
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
+                                        <i className="bi bi-paperclip me-2"></i>
+                                        Upload Files
+                                    </button>
+
+                                    <span className="small text-muted">
+                                        Or paste an image using Ctrl + V
+                                    </span>
+                                </div>
+
+                                <input
+                                    ref={fileInputRef}
+                                    type="file"
+                                    multiple
+                                    accept="image/*,video/*,.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx"
+                                    hidden
+                                    disabled={isLoading}
+                                    onChange={handleFileSelect}
+                                />
+
+                                {cameraOpen && (
+                                    <div className="mt-3">
+                                        <div className="d-flex align-items-center justify-content-between mb-2">
+                                            <span className="badge bg-danger">
+                                                <span className="spinner-grow spinner-grow-sm me-1" aria-hidden="true"></span>
+                                                LIVE CAMERA
+                                            </span>
+                                            <small className="text-muted">
+                                                Preview is live; recording is optional.
+                                            </small>
+                                        </div>
+                                        <video
+                                            ref={liveCameraRef}
+                                            autoPlay
+                                            muted
+                                            playsInline
+                                            className="attachment-preview w-100"
+                                            style={{ maxHeight: "320px", background: "#000", objectFit: "contain" }}
+                                        />
+                                        <div className="d-flex flex-wrap align-items-center gap-2 mt-2">
+                                            <button
+                                                type="button"
+                                                className="btn btn-success"
+                                                disabled={isLoading || isRecording || files.length >= MAX_FILES}
+                                                onClick={captureLivePhoto}
+                                            >
+                                                <i className="bi bi-camera-fill me-2"></i>
+                                                Capture Photo
+                                            </button>
+                                            {!isRecording ? (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline-danger"
+                                                    disabled={isLoading || files.length >= MAX_FILES}
+                                                    onClick={startVideoRecording}
+                                                >
+                                                    <i className="bi bi-record-circle me-2"></i>
+                                                    Start Recording
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-danger"
+                                                    onClick={stopVideoRecording}
+                                                >
+                                                    <i className="bi bi-stop-circle me-2"></i>
+                                                    Stop Recording ({Math.floor(recordingSeconds / 60)}:{String(recordingSeconds % 60).padStart(2, "0")})
+                                                </button>
+                                            )}
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-secondary"
+                                                disabled={isLoading || isRecording}
+                                                onClick={closeLiveCamera}
+                                            >
+                                                Close Camera
+                                            </button>
+                                        </div>
+                                        {!isRecording && (
+                                            <div className="small text-success mt-2" role="status" aria-live="polite">
+                                                <i className="bi bi-broadcast me-2"></i>
+                                                Live camera preview is active. You can capture a photo, start recording, or simply close the camera.
+                                            </div>
+                                        )}
+                                        {isRecording && (
+                                            <div className="small text-danger mt-2" role="status" aria-live="polite">
+                                                <span className="spinner-grow spinner-grow-sm me-2"></span>
+                                                Recording in progress. Keep this tab open until you stop recording.
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {cameraError && (
+                                    <div className="text-danger small mt-2" role="alert">
+                                        {cameraError}
+                                    </div>
+                                )}
+
+                                <div className="small text-muted mt-2">
+                                    Use the live camera to capture a photo or record a video, or upload files from your device. Camera and microphone access requires HTTPS or localhost. Maximum 3 attachments per note.
+                                </div>
+
+                                {formErrors.files && (
+                                    <div className="text-danger mt-1 small">
+                                        {formErrors.files}
+                                    </div>
+                                )}
+
+                                {files.length > 0 && (
+                                    <div className="row g-2 mt-2">
+                                        {files.map(item => (
+                                            <div
+                                                className="col-6 col-md-4"
+                                                key={item.id}
+                                            >
+                                                <div className="attachment-card">
+                                                    <button
+                                                        type="button"
+                                                        className="attachment-remove"
+                                                        disabled={isLoading}
+                                                        onClick={() => removeFile(item.id)}
+                                                        aria-label="Remove attachment"
+                                                    >
+                                                        ×
+                                                    </button>
+
+                                                    {item.file.type.startsWith("video/") && item.previewUrl ? (
+                                                        <video
+                                                            src={item.previewUrl}
+                                                            className="attachment-preview"
+                                                            controls
+                                                            playsInline
+                                                        />
+                                                    ) : item.file.type.startsWith("image/") && item.previewUrl ? (
+                                                        <img
+                                                            src={item.previewUrl}
+                                                            className="attachment-preview"
+                                                            alt={item.file.name}
+                                                        />
+                                                    ) : (
+                                                        <div className="attachment-preview d-flex align-items-center justify-content-center">
+                                                            <i className="bi bi-file-earmark-text fs-1 text-primary"></i>
+                                                        </div>
+                                                    )}
+
+                                                    <div
+                                                        className="small fw-semibold text-truncate mt-2"
+                                                        title={item.file.name}
+                                                    >
+                                                        {item.file.name}
+                                                    </div>
+
+                                                    <div className="small text-muted">
+                                                        {(item.file.size / 1024).toFixed(1)} KB
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Upload progress */}
+                        {uploadProgress && (
+                            <div className="alert alert-info mt-3 py-2">
+                                <span className="spinner-border spinner-border-sm me-2"></span>
+                                {uploadProgress}
+                            </div>
+                        )}
+
+                        {/* API error */}
+                        {isSuccess === false && (
+                            <div className="alert alert-danger mt-3 py-2" role="alert">
+                                {apiError || "An error occurred. Please try again."}
+                            </div>
+                        )}
+
+                        {/* Submit */}
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="btn btn-primary mt-2 px-4 py-2 custom-submit-btn fw-semibold rounded-3 shadow-sm"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <span
+                                        className="spinner-border spinner-border-sm me-2"
+                                        role="status"
+                                    ></span>
+                                    Processing...
+                                </>
+                            ) : (
+                                "Submit"
+                            )}
+                        </button>
+
+                        {/* Success */}
+                        {isSuccess === true && (
+                            <div
+                                className="alert alert-success mt-3 py-2 text-center"
+                                role="alert"
+                            >
+                                {savedAttachmentCount > 0
+                                    ? `Note and ${savedAttachmentCount} attachment(s) saved successfully!`
+                                    : "Note saved successfully!"}
+                            </div>
+                        )}
+
+                    </form>
+                </div>
+            </div>
+        </>
+    );
+}
+export default CreateShortNote;

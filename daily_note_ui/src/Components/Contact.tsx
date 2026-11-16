@@ -239,8 +239,8 @@ function Contact({ onSubmitContact }) {
                                             <div className="text cl-pl-3">
                                                 <p>
                                                     <span>Website:</span>
-                                                    <a href="https://example.com">
-                                                        example.com
+                                                    <a href="">
+                                                        Coming Soon
                                                     </a>
                                                 </p>
                                             </div>

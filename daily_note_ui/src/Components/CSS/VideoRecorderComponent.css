@@ -1,0 +1,393 @@
+/* Enterprise Video Recording Studio Styles */
+
+.vrc-shell {
+  background-color: #111113;
+  color: #f4f4f5;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #27272a;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: all 0.25s ease;
+}
+
+.vrc-shell--compact {
+  max-width: 920px;
+  height: 540px;
+  margin: 24px auto;
+  border-radius: 14px;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.45);
+}
+
+.vrc-shell--full {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100vw;
+  margin: 0;
+  border-radius: 0;
+  z-index: 9999;
+}
+
+/* Top Telemetry Header */
+.vrc-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px;
+  background-color: #18181b;
+  border-bottom: 1px solid #27272a;
+  z-index: 15;
+}
+
+.vrc-header__left,
+.vrc-header__right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.vrc-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.vrc-status-dot--recording {
+  background-color: #ef4444;
+  box-shadow: 0 0 8px #ef4444;
+  animation: vrc-pulse 1.5s infinite;
+}
+
+@keyframes vrc-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.vrc-header__title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e4e4e7;
+}
+
+.vrc-timer-badge {
+  font-size: 12px;
+  font-weight: 600;
+  background-color: #27272a;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-variant-numeric: tabular-nums;
+  color: #a1a1aa;
+}
+
+/* Zoom Controls */
+.vrc-zoom-group {
+  display: flex;
+  align-items: center;
+  background-color: #27272a;
+  border-radius: 8px;
+  padding: 2px 6px;
+  gap: 6px;
+}
+
+.vrc-zoom-btn {
+  background: transparent;
+  border: none;
+  color: #f4f4f5;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background-color 0.15s;
+}
+
+.vrc-zoom-btn:hover:not(:disabled) {
+  background-color: #3f3f46;
+}
+
+.vrc-zoom-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vrc-zoom-label {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 32px;
+  text-align: center;
+  color: #38bdf8;
+}
+
+.vrc-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: #27272a;
+  color: #f4f4f5;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.vrc-view-toggle:hover {
+  background-color: #3f3f46;
+  border-color: #52525b;
+}
+
+/* Main Stage Viewport */
+.vrc-stage {
+  flex: 1;
+  position: relative;
+  background-color: #09090b;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vrc-video-stream {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s ease-out, opacity 0.2s ease;
+}
+
+.vrc-video-stream--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vrc-review-stream {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background-color: #000000;
+}
+
+/* Placeholders */
+.vrc-placeholder {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px;
+  max-width: 400px;
+  gap: 12px;
+}
+
+.vrc-screen-icon-circle {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #60a5fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vrc-placeholder__heading {
+  font-size: 17px;
+  font-weight: 600;
+  color: #f4f4f5;
+}
+
+.vrc-placeholder__sub {
+  font-size: 13px;
+  color: #a1a1aa;
+  line-height: 1.5;
+}
+
+.vrc-avatar-circle {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background-color: #27272a;
+  border: 1px solid #3f3f46;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a1a1aa;
+}
+
+.vrc-avatar-subtext {
+  font-size: 13px;
+  color: #71717a;
+}
+
+/* Overlays */
+.vrc-error-banner {
+  position: absolute;
+  top: 14px;
+  left: 16px;
+  right: 16px;
+  background-color: rgba(185, 28, 28, 0.92);
+  color: #ffffff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  z-index: 20;
+}
+
+.vrc-upload-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(9, 9, 11, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+.vrc-upload-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #38bdf8;
+}
+
+/* Bottom Floating Control Dock (Teams / Zoom Style) */
+.vrc-dock {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background-color: rgba(24, 24, 27, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.6);
+  z-index: 25;
+}
+
+.vrc-dock__icon-btn {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  border: none;
+  background-color: #27272a;
+  color: #ffffff !important;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.18s, transform 0.1s;
+}
+
+.vrc-dock__icon-btn svg {
+  stroke: #ffffff !important;
+  fill: none;
+}
+
+.vrc-dock__icon-btn:hover:not(:disabled) {
+  background-color: #3f3f46;
+  transform: translateY(-1px);
+}
+
+.vrc-dock__icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.vrc-dock__icon-btn--danger {
+  background-color: #dc2626 !important;
+}
+
+.vrc-dock__icon-btn--danger:hover:not(:disabled) {
+  background-color: #b91c1c !important;
+}
+
+.vrc-dock__icon-btn--active {
+  background-color: #2563eb !important;
+}
+
+.vrc-dock__icon-btn--active:hover:not(:disabled) {
+  background-color: #1d4ed8 !important;
+}
+
+.vrc-dock__divider {
+  width: 1px;
+  height: 26px;
+  background-color: #3f3f46;
+  margin: 0 4px;
+}
+
+.vrc-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.18s, transform 0.1s;
+}
+
+.vrc-btn svg {
+  stroke: #ffffff;
+}
+
+.vrc-btn:hover {
+  transform: translateY(-1px);
+}
+
+.vrc-btn--primary {
+  background-color: #2563eb;
+}
+
+.vrc-btn--primary:hover {
+  background-color: #1d4ed8;
+}
+
+.vrc-btn--record {
+  background-color: #dc2626;
+}
+
+.vrc-btn--record:hover {
+  background-color: #b91c1c;
+}
+
+.vrc-btn--stop {
+  background-color: #ef4444;
+  font-weight: 700;
+}
+
+.vrc-btn--stop:hover {
+  background-color: #dc2626;
+}
+
+.vrc-btn--secondary {
+  background-color: #3f3f46;
+  padding: 10px 16px;
+}
+
+.vrc-btn--secondary:hover {
+  background-color: #52525b;
+}
+
+.vrc-btn--save {
+  background-color: #16a34a;
+}
+
+.vrc-btn--save:hover {
+  background-color: #15803d;
+}
