@@ -387,19 +387,48 @@ function ShortNoteView() {
                 <div className="short-note-state short-note-error-card">
                     <h2>Unable to load note</h2>
                     <p>{error}</p>
-                    <div className="short-note-error-actions">
+                    <div
+                        className="short-note-error-actions"
+                        style={{
+                            display: "flex",
+                            flexWrap: "wrap",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            gap: "12px",
+                            marginTop: "18px"
+                        }}
+                    >
                         <button
                             type="button"
-                            className="short-note-back-button"
                             onClick={() => {
                                 setError("");
                                 setLoading(true);
                                 setRetryCount((current) => current + 1);
                             }}
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: "8px",
+                                padding: "10px 20px",
+                                border: "1px solid #0d6efd",
+                                borderRadius: "8px",
+                                backgroundColor: "#0d6efd",
+                                color: "#ffffff",
+                                fontSize: "14px",
+                                fontWeight: 600,
+                                lineHeight: 1.5,
+                                cursor: "pointer",
+                                boxShadow: "0 2px 6px rgba(13, 110, 253, 0.2)"
+                            }}
                         >
-                            🔄 Try Again
+                            <span aria-hidden="true">↻</span>
+                            Try Again
                         </button>
-                        <Link to="/get-all-short-notes" className="short-note-back-button">
+                        <Link
+                            to="/get-all-short-notes"
+                            className="short-note-back-button"
+                        >
                             ← Back to Short Notes
                         </Link>
                     </div>
