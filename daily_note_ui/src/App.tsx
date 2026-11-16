@@ -34,8 +34,7 @@ function App() {
           <Link to="/today-task">Today Task</Link> |{" "}
           <Link to="/get-all-tasks">Get All Tasks</Link> |{" "}
           <Link to="/get-all-short-notes">Get All Short Notes</Link>
-          // Navbar ke andar link add kar:
-<Link to="/live-video">🎥 Live Video</Link>
+          <Link to="/live-video">🎥 Live Video</Link>
         </nav>
 
         {/* Routes */}
@@ -54,8 +53,7 @@ function App() {
           <Route path="/today-task" element={<TodayTask />} />
           <Route path="/get-all-tasks" element={<GetAllTask />} />
           <Route path="*" element={<PageNotFound />} />
-          // Routes ke andar route add kar:
-<Route path="/live-video" element={<LiveVideoRecorderComponent />} />
+         <Route path="/live-video" element={<LiveVideoRecorderComponent />} />
         </Routes>
       </BrowserRouter>
     </>
