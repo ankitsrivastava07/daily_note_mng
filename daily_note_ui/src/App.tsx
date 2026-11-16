@@ -26,7 +26,7 @@ function App() {
           <Link to="/create-note">Create Note</Link> |{" "}
           <Link to="/all-note">All Notes</Link> |{" "}
           <Link to="/short-note">Short Note</Link> |{" "}
-          <Link to="/camera-upload">📸 Camera Upload</Link> |{" "} {/* <-- Yeh nav link add kiya hai */}
+          <Link to="/camera-upload">📸 Capture & Attach </Link> |{" "} {/* <-- Yeh nav link add kiya hai */}
           <Link to="/workspace">Create Work Space</Link> |{" "}
           <Link to="/all-workspace">All Work Space</Link> |{" "}
           <Link to="/task">Task</Link> |{" "}
