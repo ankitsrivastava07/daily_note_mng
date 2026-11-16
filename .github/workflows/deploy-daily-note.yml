@@ -49,6 +49,8 @@ jobs:
         run: |
           chmod +x mvnw
           ./mvnw clean package -DskipTests
+          # Yeh check karne ke liye ki jar bani ya nahi:
+          ls -la target/
 
       # 4. Configure AWS credentials
       - name: Configure AWS credentials
