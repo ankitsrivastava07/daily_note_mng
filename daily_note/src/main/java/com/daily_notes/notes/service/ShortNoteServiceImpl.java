@@ -158,7 +158,6 @@ public class ShortNoteServiceImpl implements ShortNoteService {
             } else if (!data.isEmpty() && shortNote.getAttachement() == null) {
                 shortNoteDao.updateShortNoteField(shortNote.getId(), shortNote.getUserId(), data.size());
             }
-            shortNoteDto.setNumberOfAttachments(data.size());
         }
         shortNoteDto.setNumberOfAttachments(shortNote.getAttachement());
         return new ApiResponse()
