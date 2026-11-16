@@ -1,216 +1,268 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
-interface LiveVideoRecorderProps {
-  referenceId?: string;
-  onUploadSuccess?: (fileName: string) => void;
-}
-
-const LiveVideoRecorderComponent: React.FC<LiveVideoRecorderProps> = ({
-  referenceId = 'note_123',
-  onUploadSuccess,
+const LiveVideoRecorderComponent = ({
+  getPresignedUploadUrl, // async () => ({ uploadUrl, fileKey })
+  onUploadSuccess,       // (fileKey) => void
+  onError,               // (errorMessage) => void
+  maxDurationSec = 120,
 }) => {
-  const [recording, setRecording] = useState(false);
-  const [videoBlob, setVideoBlob] = useState<Blob | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [status, setStatus] = useState('IDLE'); // IDLE | PREVIEW | RECORDING | STOPPED | UPLOADING
+  const [recordedBlob, setRecordedBlob] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  const videoRef = useRef(null);
+  const mediaStreamRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
 
-  // Component unmount hone par camera/mic resources properly release karo
+  // Stop all active media tracks & clear timers
+  const cleanupStream = useCallback(() => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (mediaStreamRef.current) {
+      mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+      mediaStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  // Revoke object URL to prevent memory leaks
   useEffect(() => {
     return () => {
-      stopMediaTracks();
-      if (videoUrl) URL.revokeObjectURL(videoUrl);
+      cleanupStream();
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
     };
-  }, [videoUrl]);
+  }, [cleanupStream, previewUrl]);
 
-  const stopMediaTracks = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    }
+  // Select best supported MIME type
+  const getSupportedMimeType = () => {
+    const types = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm',
+      'video/mp4',
+    ];
+    return types.find((type) => MediaRecorder.isTypeSupported(type)) || '';
   };
 
-  // 1. Live Camera Stream & Recording Start
-  const startRecording = async () => {
-    setErrorMsg(null);
+  // 1. Initialize Camera & Audio Preview
+  const startCamera = async () => {
     try {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(null);
+      }
+      setRecordedBlob(null);
+      setElapsedSeconds(0);
+
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment' }, // Mobile par rear camera prefer karega
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: true,
       });
 
-      streamRef.current = stream;
+      mediaStreamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.muted = true; // Prevent audio feedback during live preview
+        await videoRef.current.play();
       }
+      setStatus('PREVIEW');
+    } catch (err) {
+      onError?.(`Camera/Microphone access denied or unavailable: ${err.message}`);
+    }
+  };
 
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-        ? 'video/webm;codecs=vp9'
-        : 'video/webm';
+  // 2. Start MediaRecorder
+  const startRecording = () => {
+    if (!mediaStreamRef.current) return;
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
-      mediaRecorderRef.current = mediaRecorder;
+    try {
       chunksRef.current = [];
+      const mimeType = getSupportedMimeType();
+      const options = mimeType ? { mimeType } : undefined;
+      const recorder = new MediaRecorder(mediaStreamRef.current, options);
 
-      mediaRecorder.ondataavailable = (event) => {
+      recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           chunksRef.current.push(event.data);
         }
       };
 
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-        const generatedUrl = URL.createObjectURL(blob);
-        setVideoBlob(blob);
-        setVideoUrl(generatedUrl);
-        stopMediaTracks();
+      recorder.onstop = () => {
+        const finalMimeType = recorder.mimeType || 'video/webm';
+        const blob = new Blob(chunksRef.current, { type: finalMimeType });
+        const url = URL.createObjectURL(blob);
+
+        setRecordedBlob(blob);
+        setPreviewUrl(url);
+        cleanupStream();
+
+        if (videoRef.current) {
+          videoRef.current.srcObject = null;
+          videoRef.current.src = url;
+          videoRef.current.muted = false;
+        }
+        setStatus('STOPPED');
       };
 
-      mediaRecorder.start(250); // Har 250ms mein data chunks collect karega
-      setRecording(true);
-    } catch (err: any) {
-      console.error('Camera initialization error:', err);
-      setErrorMsg('Camera access nahi mila. Browser permissions check karo.');
+      recorder.onerror = (event) => {
+        cleanupStream();
+        setStatus('IDLE');
+        onError?.(`Recording error: ${event.error?.message || 'Unknown error'}`);
+      };
+
+      mediaRecorderRef.current = recorder;
+      recorder.start(1000); // Collect chunks every 1s
+      setStatus('RECORDING');
+      setElapsedSeconds(0);
+
+      timerRef.current = setInterval(() => {
+        setElapsedSeconds((prev) => {
+          if (prev + 1 >= maxDurationSec) {
+            stopRecording();
+            return maxDurationSec;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    } catch (err) {
+      onError?.(`Failed to start recording: ${err.message}`);
     }
   };
 
-  // 2. Recording Stop
+  // 3. Stop Recording
   const stopRecording = () => {
-    if (mediaRecorderRef.current && recording) {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      setRecording(false);
     }
   };
 
-  // 3. Reset State
-  const resetRecorder = () => {
-    if (videoUrl) URL.revokeObjectURL(videoUrl);
-    setVideoUrl(null);
-    setVideoBlob(null);
-    setErrorMsg(null);
-  };
-
-  // 4. DMS API -> S3 Pre-signed URL Upload
+  // 4. Upload Recorded Video Blob to S3 via Pre-Signed URL
   const handleUpload = async () => {
-    if (!videoBlob) return;
-    setLoading(true);
-    setErrorMsg(null);
+    if (!recordedBlob) return;
 
     try {
-      const fileName = `video_note_${Date.now()}.webm`;
+      setStatus('UPLOADING');
+      const contentType = recordedBlob.type || 'video/webm';
+      const { uploadUrl, fileKey } = await getPresignedUploadUrl(contentType);
 
-      // DMS API se pre-signed URL fetch karo
-      const dmsResponse = await fetch(
-        `/api/v1/documents/presigned-url?referenceId=${encodeURIComponent(referenceId)}&fileNames=${encodeURIComponent(fileName)}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      if (!dmsResponse.ok) {
-        throw new Error(`DMS API Error: ${dmsResponse.status}`);
-      }
-
-      const result = await dmsResponse.json();
-      const uploadUrl = result.data ? result.data[0] : result[0];
-
-      if (!uploadUrl) {
-        throw new Error('Pre-signed URL missing in backend response.');
-      }
-
-      // Direct S3 Bucket Upload
-      const s3Response = await fetch(uploadUrl, {
+      const uploadResponse = await fetch(uploadUrl, {
         method: 'PUT',
         headers: {
-          'Content-Type': 'video/webm',
+          'Content-Type': contentType,
         },
-        body: videoBlob,
+        body: recordedBlob,
       });
 
-      if (!s3Response.ok) {
-        throw new Error(`S3 Upload Failed: ${s3Response.status}`);
+      if (!uploadResponse.ok) {
+        throw new Error(`S3 upload failed with status ${uploadResponse.status}`);
       }
 
-      alert('Video note successfully S3 par upload ho gaya!');
-      if (onUploadSuccess) onUploadSuccess(fileName);
+      onUploadSuccess?.(fileKey);
       resetRecorder();
-    } catch (err: any) {
-      console.error('Upload flow error:', err);
-      setErrorMsg(err.message || 'Video upload fail ho gaya.');
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      setStatus('STOPPED');
+      onError?.(`Upload failed: ${err.message}`);
     }
+  };
+
+  // 5. Reset & Cleanup
+  const resetRecorder = () => {
+    cleanupStream();
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setPreviewUrl(null);
+    setRecordedBlob(null);
+    setElapsedSeconds(0);
+    setStatus('IDLE');
+  };
+
+  const formatTime = (sec) => {
+    const mins = String(Math.floor(sec / 60)).padStart(2, '0');
+    const secs = String(sec % 60).padStart(2, '0');
+    return `${mins}:${secs}`;
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: '480px', margin: '20px auto', background: '#fff', borderRadius: '10px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}>
-      <h3 style={{ marginBottom: '12px' }}>🎥 Live Video Note</h3>
-
-      {errorMsg && (
-        <div style={{ padding: '10px', marginBottom: '12px', background: '#fee2e2', color: '#b91c1c', borderRadius: '6px', fontSize: '14px' }}>
-          {errorMsg}
-        </div>
-      )}
-
-      {/* Video Preview / Playback Frame */}
-      <div style={{ width: '100%', height: '260px', background: '#111', borderRadius: '8px', overflow: 'hidden', marginBottom: '16px', position: 'relative' }}>
-        {!videoUrl ? (
-          <video ref={videoRef} autoPlay muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        ) : (
-          <video src={videoUrl} controls style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        )}
-
-        {recording && (
-          <span style={{ position: 'absolute', top: '12px', left: '12px', background: 'rgba(220, 38, 38, 0.9)', color: '#fff', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 'bold' }}>
-            ● REC
-          </span>
+    <div style={{ maxWidth: '640px', margin: '0 auto', fontFamily: 'sans-serif' }}>
+      <div style={{ position: 'relative', backgroundColor: '#000', borderRadius: '8px', overflow: 'hidden' }}>
+        <video
+          ref={videoRef}
+          playsInline
+          controls={status === 'STOPPED'}
+          style={{ width: '100%', display: 'block', maxHeight: '400px' }}
+        />
+        {status === 'RECORDING' && (
+          <div
+            style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              background: 'rgba(220, 38, 38, 0.9)',
+              color: '#fff',
+              padding: '4px 10px',
+              borderRadius: '4px',
+              fontSize: '13px',
+              fontWeight: 'bold',
+            }}
+          >
+            ● REC {formatTime(elapsedSeconds)}
+          </div>
         )}
       </div>
 
-      {/* Action Buttons */}
-      <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-        {!recording && !videoUrl && (
-          <button
-            onClick={startRecording}
-            style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
-          >
-            🔴 Start Live Recording
+      <div style={{ display: 'flex', gap: '10px', marginTop: '12px', justifyContent: 'center' }}>
+        {status === 'IDLE' && (
+          <button type="button" onClick={startCamera}>
+            Open Camera
           </button>
         )}
 
-        {recording && (
-          <button
-            onClick={stopRecording}
-            style={{ background: '#dc2626', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
-          >
-            ⏹ Stop Recording
-          </button>
-        )}
-
-        {videoUrl && (
+        {status === 'PREVIEW' && (
           <>
-            <button
-              onClick={resetRecorder}
-              disabled={loading}
-              style={{ background: '#64748b', color: '#fff', border: 'none', padding: '10px 16px', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
-            >
-              🔄 Retake
+            <button type="button" onClick={startRecording}>
+              Start Recording
             </button>
-            <button
-              onClick={handleUpload}
-              disabled={loading}
-              style={{ background: '#2563eb', color: '#fff', border: 'none', padding: '10px 18px', borderRadius: '6px', cursor: 'pointer', fontWeight: 500 }}
-            >
-              {loading ? 'Uploading...' : '☁️ Upload Video Note'}
+            <button type="button" onClick={resetRecorder}>
+              Cancel
             </button>
           </>
         )}
+
+        {status === 'RECORDING' && (
+          <button type="button" onClick={stopRecording}>
+            Stop Recording
+          </button>
+        )}
+
+        {status === 'STOPPED' && (
+          <>
+            <button type="button" onClick={handleUpload}>
+              Upload Video
+            </button>
+            <button type="button" onClick={startCamera}>
+              Retake
+            </button>
+            <button type="button" onClick={resetRecorder}>
+              Discard
+            </button>
+          </>
+        )}
+
+        {status === 'UPLOADING' && <button disabled>Uploading...</button>}
       </div>
     </div>
   );
