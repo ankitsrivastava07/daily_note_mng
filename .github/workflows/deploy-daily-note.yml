@@ -47,8 +47,7 @@ jobs:
       - name: Build Spring Boot application
         working-directory: daily_note
         run: |
-          chmod +x mvnw
-          ./mvnw clean package -DskipTests
+          mvn clean package -DskipTests
 
       # 4. Configure AWS credentials
       - name: Configure AWS credentials
@@ -100,7 +99,7 @@ jobs:
             --sbom=false \
             --output "type=image,name=$ECR_REGISTRY/dailynote:$IMAGE_TAG,push=true,oci-mediatypes=false,compression=gzip" \
             -f daily_note/Dockerfile \
-            .
+            daily_note
 
       # 9. Verify ECR image manifest
       - name: Verify ECR image manifest
