@@ -160,6 +160,7 @@ public class ShortNoteServiceImpl implements ShortNoteService {
             }
             shortNoteDto.setNumberOfAttachments(data.size());
         }
+        shortNoteDto.setNumberOfAttachments(shortNote.getAttachement());
         return new ApiResponse()
                 .success(Boolean.TRUE)
                 .message(ApiResponseConstant.API_RESPONSE_SUCCESS)
