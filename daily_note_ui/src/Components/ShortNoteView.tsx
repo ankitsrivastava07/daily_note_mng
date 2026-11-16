@@ -36,6 +36,7 @@ function ShortNoteView() {
     const [attachmentError, setAttachmentError] = useState("");
     const [attachmentLoading, setAttachmentLoading] = useState(false);
     const [openingAttachment, setOpeningAttachment] = useState<string | null>(null);
+    const [retryCount, setRetryCount] = useState(0);
 
     // ==========================================
     // EFFECT 1: FETCH SHORT NOTE ONLY (ISOLATED)
@@ -73,9 +74,18 @@ function ShortNoteView() {
                 );
 
                 if (!noteResponse.ok) {
+                    const status = noteResponse.status;
+
+                    // Lambda Function URL can return 502/504 when the request times out.
+                    if ([408, 502, 503, 504].includes(status)) {
+                        throw new Error(
+                            "Request Timeout. The server is taking too long to respond. Please try again."
+                        );
+                    }
+
+                    const responseText = await noteResponse.text();
                     throw new Error(
-                        (await noteResponse.text()) ||
-                        `Note API failed: ${noteResponse.status}`
+                        responseText || `Unable to load short note (HTTP ${status}).`
                     );
                 }
 
@@ -99,8 +109,17 @@ function ShortNoteView() {
             } catch (err: any) {
                 if (err.name !== "AbortError") {
                     console.error("Short note error:", err);
-                    setError(err.message || "Unable to load short note.");
+
+                    // Fetch can also reject with a TypeError when the gateway/network
+                    // connection fails before a response is received.
+                    const isNetworkError = err instanceof TypeError;
+                    setError(
+                        isNetworkError
+                            ? "Request Timeout. The server is taking too long to respond. Please try again."
+                            : (err.message || "Unable to load short note.")
+                    );
                 }
+
             } finally {
                 if (!controller.signal.aborted) {
                     setLoading(false);
@@ -110,7 +129,7 @@ function ShortNoteView() {
 
         fetchShortNote();
         return () => controller.abort();
-    }, [id]);
+    }, [id, retryCount]);
 
     // ==========================================
     // EFFECT 2: FETCH DMS ATTACHMENTS SEPARATELY
@@ -368,9 +387,22 @@ function ShortNoteView() {
                 <div className="short-note-state short-note-error-card">
                     <h2>Unable to load note</h2>
                     <p>{error}</p>
-                    <Link to="/get-all-short-notes" className="short-note-back-button">
-                        ← Back to Short Notes
-                    </Link>
+                    <div className="short-note-error-actions">
+                        <button
+                            type="button"
+                            className="short-note-back-button"
+                            onClick={() => {
+                                setError("");
+                                setLoading(true);
+                                setRetryCount((current) => current + 1);
+                            }}
+                        >
+                            🔄 Try Again
+                        </button>
+                        <Link to="/get-all-short-notes" className="short-note-back-button">
+                            ← Back to Short Notes
+                        </Link>
+                    </div>
                 </div>
             </main>
         );
@@ -394,6 +426,18 @@ function ShortNoteView() {
     return (
         <>
             <style>{`
+                .short-note-error-actions {
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    align-items: center;
+                    gap: 10px;
+                    margin-top: 16px;
+                }
+                .short-note-error-actions button {
+                    cursor: pointer;
+                    font: inherit;
+                }
                 .short-note-document-open-button {
                     display: inline-flex;
                     align-items: center;
