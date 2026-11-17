@@ -1,4 +1,4 @@
-package com.daily_note_dms.documents.dto;
+package com.daily_note_dms.documents.video.dto;
 
 public class VideoUploadRequest {
     private String referenceId;
