@@ -162,9 +162,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           const displayOptions: DisplayMediaStreamOptions & { selfBrowserSurface?: string } = {
             video: { frameRate: { ideal: 30 } },
             audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainCount: false,
             } as any,
             selfBrowserSurface: 'exclude',
           };
@@ -173,7 +173,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
           try {
             const micStream = await navigator.mediaDevices.getUserMedia({
-              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
             });
             stream = new MediaStream([
               ...displayStream.getVideoTracks(),
@@ -191,6 +191,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             }
           };
         } else {
+          // Audio constraints configured to prevent background speaker / YouTube ducking/muting
           const constraints: MediaStreamConstraints = {
             video: deviceId
               ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
@@ -198,9 +199,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
               ? { facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
               : { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
             audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
             },
           };
 
@@ -209,7 +210,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           } catch {
             stream = await navigator.mediaDevices.getUserMedia({
               video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
-              audio: { echoCancellation: true, noiseSuppression: true },
+              audio: { echoCancellation: false, noiseSuppression: false },
             });
           }
         }
@@ -310,7 +311,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   };
 
   const handleFlipCamera = () => {
-    if (sourceMode === 'SCREEN') return;
+    if (sourceMode === 'SCREEN' || isCameraOff) return;
     const nextRear = !useRearCamera;
     setUseRearCamera(nextRear);
     initializeMedia('CAMERA', nextRear);
@@ -598,8 +599,8 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
                 <button
                   onClick={handleFlipCamera}
                   className={`vrc-dock__icon-btn ${useRearCamera ? 'vrc-dock__icon-btn--active' : ''}`}
-                  disabled={streamState === 'RECORDING'}
-                  title={useRearCamera ? 'Switch to Selfie Camera' : 'Switch to Mountain Rear Camera'}
+                  disabled={streamState === 'RECORDING' || isCameraOff}
+                  title={isCameraOff ? 'Turn camera on to flip' : useRearCamera ? 'Switch to Selfie Camera' : 'Switch to Mountain Rear Camera'}
                 >
                   <Icons.SwitchCamera />
                 </button>
