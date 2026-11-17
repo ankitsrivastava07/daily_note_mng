@@ -23,13 +23,19 @@ import ShortNoteUpdate from './Components/ShortNoteUpdate';
 function App() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
+  // Dropdown ko safely close karne ke liye helper function
+  const closeDropdown = () => setActiveDropdown(null);
+
   return (
     <BrowserRouter>
       {/* TCS-Style Corporate Header */}
-      <header style={tcsNavStyles.header} onMouseLeave={() => setActiveDropdown(null)}>
+      <header 
+        style={tcsNavStyles.header} 
+        onMouseLeave={closeDropdown}
+      >
         <div style={tcsNavStyles.topBar}>
           {/* Brand Logo & Name */}
-          <Link to="/" style={tcsNavStyles.logoArea}>
+          <Link to="/" style={tcsNavStyles.logoArea} onClick={closeDropdown}>
             <span style={tcsNavStyles.logoIcon}>🏢</span>
             <div style={tcsNavStyles.logoTextGroup}>
               <span style={tcsNavStyles.logoTitle}>DAILYNOTES</span>
@@ -43,49 +49,63 @@ function App() {
               style={tcsNavStyles.navItem}
               onMouseEnter={() => setActiveDropdown('notes')}
             >
-              <span style={tcsNavStyles.navLinkText}>Notes & Vault <span style={tcsNavStyles.caret}>▾</span></span>
+              <span style={tcsNavStyles.navLinkText}>
+                Notes & Vault <span style={tcsNavStyles.caret}>▾</span>
+              </span>
             </div>
 
             <div
               style={tcsNavStyles.navItem}
               onMouseEnter={() => setActiveDropdown('workspace')}
             >
-              <span style={tcsNavStyles.navLinkText}>Workspaces & Tasks <span style={tcsNavStyles.caret}>▾</span></span>
+              <span style={tcsNavStyles.navLinkText}>
+                Workspaces & Tasks <span style={tcsNavStyles.caret}>▾</span>
+              </span>
             </div>
 
             <div
               style={tcsNavStyles.navItem}
               onMouseEnter={() => setActiveDropdown('media')}
             >
-              <span style={tcsNavStyles.navLinkText}>Media & Studios <span style={tcsNavStyles.caret}>▾</span></span>
+              <span style={tcsNavStyles.navLinkText}>
+                Media & Studios <span style={tcsNavStyles.caret}>▾</span>
+              </span>
             </div>
 
             <div style={tcsNavStyles.navItem}>
-              <Link to="/about" style={{ ...tcsNavStyles.navLinkText, textDecoration: 'none', color: '#f4f4f5' }}>About</Link>
+              <Link to="/about" style={tcsNavStyles.directLink} onClick={closeDropdown}>
+                About
+              </Link>
             </div>
 
             <div style={tcsNavStyles.navItem}>
-              <Link to="/contact" style={{ ...tcsNavStyles.navLinkText, textDecoration: 'none', color: '#f4f4f5' }}>Contact</Link>
+              <Link to="/contact" style={tcsNavStyles.directLink} onClick={closeDropdown}>
+                Contact
+              </Link>
             </div>
           </nav>
         </div>
 
         {/* Mega Menu / Dropdown Panel */}
         {activeDropdown && (
-          <div style={tcsNavStyles.megaMenu} onMouseLeave={() => setActiveDropdown(null)}>
+          <div 
+            style={tcsNavStyles.megaMenu} 
+            onMouseEnter={() => {}} 
+            onMouseLeave={closeDropdown}
+          >
             <div style={tcsNavStyles.megaMenuContent}>
               {activeDropdown === 'notes' && (
                 <div style={tcsNavStyles.menuGrid}>
                   <div style={tcsNavStyles.menuColumn}>
                     <h4 style={tcsNavStyles.columnHeading}>Core Notes</h4>
-                    <Link to="/" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Home Dashboard</Link>
-                    <Link to="/create-note" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Create New Note</Link>
-                    <Link to="/all-note" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>View All Notes</Link>
+                    <Link to="/" style={tcsNavStyles.subLink} onClick={closeDropdown}>Home Dashboard</Link>
+                    <Link to="/create-note" style={tcsNavStyles.subLink} onClick={closeDropdown}>Create New Note</Link>
+                    <Link to="/all-note" style={tcsNavStyles.subLink} onClick={closeDropdown}>View All Notes</Link>
                   </div>
                   <div style={tcsNavStyles.menuColumn}>
                     <h4 style={tcsNavStyles.columnHeading}>Short Notes</h4>
-                    <Link to="/short-note" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Create Short Note</Link>
-                    <Link to="/get-all-short-notes" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Short Notes Archive</Link>
+                    <Link to="/short-note" style={tcsNavStyles.subLink} onClick={closeDropdown}>Create Short Note</Link>
+                    <Link to="/get-all-short-notes" style={tcsNavStyles.subLink} onClick={closeDropdown}>Short Notes Archive</Link>
                   </div>
                 </div>
               )}
@@ -94,14 +114,14 @@ function App() {
                 <div style={tcsNavStyles.menuGrid}>
                   <div style={tcsNavStyles.menuColumn}>
                     <h4 style={tcsNavStyles.columnHeading}>Workspaces</h4>
-                    <Link to="/workspace" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Create Workspace</Link>
-                    <Link to="/all-workspace" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>All Workspaces</Link>
+                    <Link to="/workspace" style={tcsNavStyles.subLink} onClick={closeDropdown}>Create Workspace</Link>
+                    <Link to="/all-workspace" style={tcsNavStyles.subLink} onClick={closeDropdown}>All Workspaces</Link>
                   </div>
                   <div style={tcsNavStyles.menuColumn}>
                     <h4 style={tcsNavStyles.columnHeading}>Task Management</h4>
-                    <Link to="/task" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Task Configuration</Link>
-                    <Link to="/today-task" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>Today's Tasks</Link>
-                    <Link to="/get-all-tasks" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>All Assigned Tasks</Link>
+                    <Link to="/task" style={tcsNavStyles.subLink} onClick={closeDropdown}>Task Configuration</Link>
+                    <Link to="/today-task" style={tcsNavStyles.subLink} onClick={closeDropdown}>Today's Tasks</Link>
+                    <Link to="/get-all-tasks" style={tcsNavStyles.subLink} onClick={closeDropdown}>All Assigned Tasks</Link>
                   </div>
                 </div>
               )}
@@ -110,9 +130,9 @@ function App() {
                 <div style={tcsNavStyles.menuGrid}>
                   <div style={tcsNavStyles.menuColumn}>
                     <h4 style={tcsNavStyles.columnHeading}>Capture & Stream Studios</h4>
-                    <Link to="/camera-upload" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>📸 Capture & Attach</Link>
-                    <Link to="/video-recorder" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>🎥 Mountain Video Recorder</Link>
-                    <Link to="/live-stream" style={tcsNavStyles.subLink} onClick={() => setActiveDropdown(null)}>📡 Live Broadcaster Studio</Link>
+                    <Link to="/camera-upload" style={tcsNavStyles.subLink} onClick={closeDropdown}>📸 Capture & Attach</Link>
+                    <Link to="/video-recorder" style={tcsNavStyles.subLink} onClick={closeDropdown}>🎥 Mountain Video Recorder</Link>
+                    <Link to="/live-stream" style={tcsNavStyles.subLink} onClick={closeDropdown}>📡 Live Broadcaster Studio</Link>
                   </div>
                 </div>
               )}
@@ -125,7 +145,7 @@ function App() {
       <main style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
         <Routes>
           <Route path="/" element={<Home />} />
-          <Route path="/workspace" element={<CreateWorkspace onWorkspaceCreated={undefined} />} />
+          <Route path="/workspace" element={<CreateWorkspace />} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/all-note" element={<GetAllNote />} />
@@ -210,6 +230,14 @@ const tcsNavStyles: Record<string, React.CSSProperties> = {
     display: 'flex',
     alignItems: 'center',
     gap: '4px',
+  },
+  directLink: {
+    fontSize: '14px',
+    fontWeight: 600,
+    textDecoration: 'none',
+    color: '#f4f4f5',
+    display: 'flex',
+    alignItems: 'center',
   },
   caret: {
     fontSize: '11px',
