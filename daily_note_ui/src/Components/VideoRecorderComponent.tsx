@@ -9,6 +9,7 @@ interface VideoRecorderProps {
 
 type StreamState = 'IDLE' | 'PREVIEW_LIVE' | 'RECORDING' | 'REVIEW' | 'UPLOADING';
 type SourceMode = 'CAMERA' | 'SCREEN';
+type VideoResolution = '720P' | '1080P' | '4K';
 
 const Icons = {
   MicOn: () => (
@@ -116,6 +117,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   const [sourceMode, setSourceMode] = useState<SourceMode>('CAMERA');
   const [isFullView, setIsFullView] = useState<boolean>(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [selectedResolution, setSelectedResolution] = useState<VideoResolution>('1080P');
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
 
   const [isMuted, setIsMuted] = useState<boolean>(false);
@@ -147,13 +149,14 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   }, []);
 
   const initializeMedia = useCallback(
-    async (mode: SourceMode = 'CAMERA', overrideRear?: boolean, deviceId?: string) => {
+    async (mode: SourceMode = 'CAMERA', overrideRear?: boolean, deviceId?: string, resOverride?: VideoResolution) => {
       setErrorMsg(null);
       stopAllTracks();
       setZoomLevel(1);
       setIsCameraOff(false);
 
       const rearPreferred = overrideRear !== undefined ? overrideRear : useRearCamera;
+      const targetRes = resOverride || selectedResolution;
 
       try {
         let stream: MediaStream;
@@ -187,17 +190,24 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             if (mediaRecorderRef.current?.state === 'recording') {
               stopRecording();
             } else {
-              initializeMedia('CAMERA', rearPreferred, selectedDeviceId || undefined);
+              initializeMedia('CAMERA', rearPreferred, selectedDeviceId || undefined, targetRes);
             }
           };
         } else {
-          // Audio constraints set to false to prevent YouTube/background speaker ducking or muting
+          // Dynamic Resolution Constraints Mapping
+          let videoConstraints: MediaTrackConstraints = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+          if (targetRes === '720P') {
+            videoConstraints = { width: { ideal: 1280 }, height: { ideal: 720 } };
+          } else if (targetRes === '4K') {
+            videoConstraints = { width: { ideal: 3840 }, height: { ideal: 2160 } };
+          }
+
           const constraints: MediaStreamConstraints = {
             video: deviceId
-              ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+              ? { deviceId: { exact: deviceId }, ...videoConstraints }
               : rearPreferred
-                ? { facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-                : { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
+              ? { facingMode: { exact: 'environment' }, ...videoConstraints }
+              : { facingMode: 'user', ...videoConstraints },
             audio: {
               echoCancellation: false,
               noiseSuppression: false,
@@ -209,7 +219,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             stream = await navigator.mediaDevices.getUserMedia(constraints);
           } catch {
             stream = await navigator.mediaDevices.getUserMedia({
-              video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+              video: videoConstraints,
               audio: { echoCancellation: false, noiseSuppression: false },
             });
           }
@@ -231,7 +241,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
         setErrorMsg(
           mode === 'SCREEN'
             ? 'Screen share cancelled or permission denied.'
-            : 'Camera access denied or rear camera unavailable.'
+            : 'Camera access denied or resolution unavailable.'
         );
         if (mode === 'SCREEN') {
           setSourceMode('CAMERA');
@@ -239,7 +249,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
         setStreamState('IDLE');
       }
     },
-    [selectedDeviceId, stopAllTracks, useRearCamera]
+    [selectedDeviceId, selectedResolution, stopAllTracks, useRearCamera]
   );
 
   useEffect(() => {
@@ -289,7 +299,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       };
       if (capabilities.zoom) {
         const hwZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, clamped));
-        videoTrack.applyConstraints({ advanced: [{ zoom: hwZoom } as MediaTrackConstraintSet] }).catch(() => { });
+        videoTrack.applyConstraints({ advanced: [{ zoom: hwZoom } as MediaTrackConstraintSet] }).catch(() => {});
       }
     }
   };
@@ -325,8 +335,8 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
         ? 'video/webm;codecs=vp9,opus'
         : MediaRecorder.isTypeSupported('video/webm')
-          ? 'video/webm'
-          : 'video/mp4';
+        ? 'video/webm'
+        : 'video/mp4';
 
       const recorder = new MediaRecorder(streamRef.current, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -405,11 +415,12 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
     try {
       const ext = videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
+      const mimeType = videoBlob.type || 'video/webm'; // Dynamic MIME type detected from blob
       const prefix = sourceMode === 'SCREEN' ? 'screen_capture' : 'mountain_capture';
       const fileName = `${prefix}_${Date.now()}.${ext}`;
 
       const dmsRes = await fetch(
-        `/api/v1/documents/presigned-url?referenceId=${encodeURIComponent(referenceId)}&fileNames=${encodeURIComponent(fileName)}`,
+        `/api/v1/documents/presigned-url?referenceId=${encodeURIComponent(referenceId)}&fileNames=${encodeURIComponent(fileName)}&mimeType=${encodeURIComponent(mimeType)}`,
         {
           method: 'GET',
           headers: { 'Content-Type': 'application/json' },
@@ -424,8 +435,8 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       const presignedUrl: string | undefined = Array.isArray(payload.data)
         ? payload.data[0]
         : Array.isArray(payload)
-          ? payload[0]
-          : undefined;
+        ? payload[0]
+        : undefined;
 
       if (!presignedUrl) {
         throw new Error('Pre-signed URL missing in DMS response.');
@@ -482,25 +493,44 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
         <div className="vrc-header__right">
           {sourceMode === 'CAMERA' && streamState !== 'REVIEW' && (
-            <div className="vrc-zoom-group">
-              <button
-                onClick={() => applyZoom(zoomLevel - 0.5)}
-                disabled={zoomLevel <= 1}
-                className="vrc-zoom-btn"
-                title="Zoom Out"
+            <>
+              {/* Resolution Selector Dropdown */}
+              <select
+                value={selectedResolution}
+                onChange={(e) => {
+                  const newRes = e.target.value as VideoResolution;
+                  setSelectedResolution(newRes);
+                  initializeMedia(sourceMode, useRearCamera, selectedDeviceId, newRes);
+                }}
+                disabled={streamState === 'RECORDING'}
+                className="vrc-resolution-select"
+                title="Select Recording Resolution"
               >
-                −
-              </button>
-              <span className="vrc-zoom-label">{zoomLevel.toFixed(1)}x</span>
-              <button
-                onClick={() => applyZoom(zoomLevel + 0.5)}
-                disabled={zoomLevel >= 3}
-                className="vrc-zoom-btn"
-                title="Zoom In"
-              >
-                +
-              </button>
-            </div>
+                <option value="720P">720p HD</option>
+                <option value="1080P">1080p FHD</option>
+                <option value="4K">4K UHD</option>
+              </select>
+
+              <div className="vrc-zoom-group">
+                <button
+                  onClick={() => applyZoom(zoomLevel - 0.5)}
+                  disabled={zoomLevel <= 1}
+                  className="vrc-zoom-btn"
+                  title="Zoom Out"
+                >
+                  −
+                </button>
+                <span className="vrc-zoom-label">{zoomLevel.toFixed(1)}x</span>
+                <button
+                  onClick={() => applyZoom(zoomLevel + 0.5)}
+                  disabled={zoomLevel >= 3}
+                  className="vrc-zoom-btn"
+                  title="Zoom In"
+                >
+                  +
+                </button>
+              </div>
+            </>
           )}
 
           <button
