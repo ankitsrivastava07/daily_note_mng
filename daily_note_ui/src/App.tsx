@@ -43,8 +43,9 @@ function App() {
             </div>
           </Link>
 
-          {/* Mobile Hamburger Toggle Button (Sirf Mobile par dikhega) */}
+          {/* Mobile Hamburger Toggle Button */}
           <button 
+            className="tcs-mobile-toggle"
             style={tcsNavStyles.mobileToggleBtn} 
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle Menu"
@@ -52,11 +53,8 @@ function App() {
             {mobileMenuOpen ? '✕' : '☰'}
           </button>
 
-          {/* Main Navigation (Desktop + Mobile Responsive) */}
-          <nav style={{
-            ...tcsNavStyles.mainNav,
-            ...(mobileMenuOpen ? tcsNavStyles.mobileNavOpen : tcsNavStyles.mobileNavClosed)
-          }}>
+          {/* Main Navigation (Responsive via CSS classes) */}
+          <nav className={mobileMenuOpen ? 'tcs-main-nav-mobile' : 'tcs-main-nav-desktop'} style={tcsNavStyles.mainNav}>
             <div
               style={tcsNavStyles.navItem}
               onMouseEnter={() => setActiveDropdown('notes')}
@@ -169,7 +167,6 @@ function App() {
   );
 }
 
-// Clean Styles for Desktop & Mobile Toggle
 const tcsNavStyles: Record<string, React.CSSProperties> = {
   header: {
     backgroundColor: '#121214',
@@ -216,40 +213,16 @@ const tcsNavStyles: Record<string, React.CSSProperties> = {
     letterSpacing: '1.5px',
   },
   mobileToggleBtn: {
-    display: 'none', // Default desktop par hidden rahega
     background: 'none',
     border: 'none',
     color: '#ffffff',
     fontSize: '26px',
     cursor: 'pointer',
-    '@media(max-width: 900px)': {
-      display: 'block', // Sirf mobile/tablet par dikhega
-    } as any,
   },
   mainNav: {
     display: 'flex',
     alignItems: 'center',
     gap: '32px',
-  },
-  mobileNavClosed: {
-    '@media(max-width: 900px)': {
-      display: 'none', // Mobile par jab toggle band ho
-    } as any,
-  },
-  mobileNavOpen: {
-    '@media(max-width: 900px)': {
-      display: 'flex',
-      flexDirection: 'column',
-      position: 'absolute',
-      top: '100%',
-      left: 0,
-      width: '100%',
-      backgroundColor: '#121214',
-      padding: '24px',
-      borderBottom: '1px solid #27272a',
-      gap: '16px',
-      boxShadow: '0 15px 30px rgba(0,0,0,0.7)',
-    } as any,
   },
   navItem: {
     cursor: 'pointer',

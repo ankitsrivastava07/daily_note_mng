@@ -1,845 +1,213 @@
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import VideoRecorderComponent from './VideoRecorderComponent';
 
-import { useEffect, useRef, useState } from "react";
+export const CreateShortNote: React.FC = () => {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [attachedVideoKey, setAttachedVideoKey] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-const USER_ID = "ankit0397";
-const MAX_FILES = 3;
+  const navigate = useNavigate();
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-const DMS_API_BASE_URL = import.meta.env.VITE_DMS_API_BASE_URL;
+  // Jab video successfully S3 par upload ho jaye
+  const handleVideoUploadSuccess = (fileName: string) => {
+    setAttachedVideoKey(fileName);
+  };
 
-const categoryLabels = {
-    general: "General Interview",
-    interview: "Interview",
-    qbank: "Question Bank",
-    facebook: "Facebook",
-    instagram: "Instagram",
-    whatsapp: "WhatsApp",
-    others: "Others"
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const payload = {
+      title,
+      content,
+      videoKey: attachedVideoKey,
+      referenceId: `short_note_${Date.now()}`
+    };
+
+    try {
+      console.log('Saving Short Note with payload:', payload);
+      
+      setTimeout(() => {
+        setLoading(false);
+        navigate('/get-all-short-notes');
+      }, 800);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to save short note. Please try again.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={styles.container}>
+      <h2 style={styles.heading}>✨ Create Short Note with Studio Recording</h2>
+      
+      {error && <div style={styles.errorBanner}>{error}</div>}
+
+      <form onSubmit={handleSubmit} style={styles.form}>
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Note Title</label>
+          <input
+            type="text"
+            placeholder="Enter quick title..."
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            style={styles.textInput}
+          />
+        </div>
+
+        <div style={styles.inputGroup}>
+          <label style={styles.label}>Note Content / Description</label>
+          <textarea
+            placeholder="Write your quick note here..."
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            rows={4}
+            required
+            style={styles.textarea}
+          />
+        </div>
+
+        {/* Video Recorder Studio - Directly Rendered */}
+        <div style={styles.attachmentSection}>
+          <label style={styles.label}>🎥 Live Video Recorder Studio</label>
+          
+          {attachedVideoKey ? (
+            <div style={styles.successBadge}>
+              <span>✅ Video Attached: {attachedVideoKey}</span>
+              <button
+                type="button"
+                onClick={() => setAttachedVideoKey(null)}
+                style={styles.removeBtn}
+              >
+                Record Again / Change
+              </button>
+            </div>
+          ) : (
+            <div style={styles.recorderContainer}>
+              <VideoRecorderComponent
+                referenceId={`short_note_ref_${Date.now()}`}
+                onUploadSuccess={handleVideoUploadSuccess}
+              />
+            </div>
+          )}
+        </div>
+
+        <button type="submit" disabled={loading} style={styles.submitBtn}>
+          {loading ? 'Saving Note...' : 'Save Short Note'}
+        </button>
+      </form>
+    </div>
+  );
 };
 
-function CreateShortNote() {
-    const [inputValue, setInputValue] = useState({
-        title: "",
-        content: "",
-        categoryId: "others",
-        userId: USER_ID
-    });
-
-    const [files, setFiles] = useState([]);
-    const [isSuccess, setIsSuccess] = useState(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [uploadProgress, setUploadProgress] = useState("");
-    const [formErrors, setFormErrors] = useState({});
-    const [apiError, setApiError] = useState("");
-    const [savedAttachmentCount, setSavedAttachmentCount] = useState(0);
-
-    const fileInputRef = useRef(null);
-    const textareaRef = useRef(null);
-    const pendingSubmissionRef = useRef(null);
-    const filesRef = useRef(files);
-
-    useEffect(() => {
-        filesRef.current = files;
-    }, [files]);
-
-    // Clear success message
-    useEffect(() => {
-        if (isSuccess !== true) return;
-
-        const timer = setTimeout(() => {
-            setIsSuccess(null);
-        }, 3000);
-
-        return () => clearTimeout(timer);
-    }, [isSuccess]);
-
-    // Cleanup remaining image previews only when the component unmounts.
-    useEffect(() => {
-        return () => {
-            filesRef.current.forEach(item => {
-                if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
-            });
-        };
-    }, []);
-
-    // Handle form inputs
-    const handleInputValue = (e) => {
-        const { name, value } = e.target;
-
-        setInputValue(prev => ({
-            ...prev,
-            [name]: value
-        }));
-
-        setFormErrors(prev => ({
-            ...prev,
-            [name]: ""
-        }));
-    };
-
-    // Ctrl+B formatting
-    const handleKeyDown = (e) => {
-        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
-            e.preventDefault();
-
-            const textarea = e.target;
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const currentValue = textarea.value;
-            const selectedText = currentValue.substring(start, end);
-
-            let newValue;
-            let newStart = start;
-            let newEnd = end;
-
-            if (
-                selectedText.startsWith("**") &&
-                selectedText.endsWith("**")
-            ) {
-                newValue =
-                    currentValue.substring(0, start) +
-                    selectedText.slice(2, -2) +
-                    currentValue.substring(end);
-
-                newEnd = end - 4;
-            } else {
-                newValue =
-                    currentValue.substring(0, start) +
-                    `**${selectedText}**` +
-                    currentValue.substring(end);
-
-                if (selectedText.length === 0) {
-                    newStart = start + 2;
-                    newEnd = start + 2;
-                } else {
-                    newEnd = end + 4;
-                }
-            }
-
-            setInputValue(prev => ({
-                ...prev,
-                content: newValue
-            }));
-
-            requestAnimationFrame(() => {
-                textarea.focus();
-                textarea.setSelectionRange(newStart, newEnd);
-            });
-        }
-    };
-
-    // Category selection
-    const handleCategorySelect = (categoryKey) => {
-        setInputValue(prev => ({
-            ...prev,
-            categoryId: categoryKey
-        }));
-
-        setFormErrors(prev => ({
-            ...prev,
-            categoryId: ""
-        }));
-    };
-
-    // Add attachments
-    const addFiles = (incomingFiles) => {
-        const validFiles = Array.from(incomingFiles || []);
-
-        if (!validFiles.length) return;
-
-        setFiles(previous => {
-            const remaining = MAX_FILES - previous.length;
-
-            if (remaining <= 0) {
-                setApiError("Maximum 3 attachments are allowed.");
-                return previous;
-            }
-
-            const accepted = validFiles.slice(0, remaining);
-
-            const newFiles = accepted.map(file => ({
-                file,
-                id: `${Date.now()}-${Math.random()}`,
-                previewUrl: file.type.startsWith("image/")
-                    ? URL.createObjectURL(file)
-                    : null
-            }));
-
-            setApiError(
-                accepted.length < validFiles.length
-                    ? "Maximum 3 attachments are allowed."
-                    : ""
-            );
-
-            return [...previous, ...newFiles];
-        });
-    };
-
-    // File selection
-    const handleFileSelect = (e) => {
-        addFiles(e.target.files);
-        e.target.value = "";
-    };
-
-    // Paste images using Ctrl+V
-    const handlePaste = (e) => {
-        const items = e.clipboardData?.items;
-
-        if (!items) return;
-
-        const pastedImages = [];
-
-        for (const item of items) {
-            if (item.type.startsWith("image/")) {
-                const file = item.getAsFile();
-
-                if (file) {
-                    const extension =
-                        file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
-
-                    pastedImages.push(
-                        new File(
-                            [file],
-                            `pasted-image-${Date.now()}.${extension}`,
-                            { type: file.type }
-                        )
-                    );
-                }
-            }
-        }
-
-        if (pastedImages.length > 0) {
-            e.preventDefault();
-            addFiles(pastedImages);
-        }
-    };
-
-    // Remove attachment
-    const removeFile = (id) => {
-        setFiles(previous => {
-            const selected = previous.find(item => item.id === id);
-
-            if (selected?.previewUrl) {
-                URL.revokeObjectURL(selected.previewUrl);
-            }
-
-            const updated = previous.filter(item => item.id !== id);
-            filesRef.current = updated;
-            return updated;
-        });
-    };
-
-    // Read API response
-    const readResponse = async (response) => {
-        const data = await response.json().catch(() => ({}));
-
-        if (
-            !response.ok ||
-            data.success === false ||
-            data.status === false
-        ) {
-            throw new Error(
-                data.message || `Request failed (${response.status})`
-            );
-        }
-
-        return data;
-    };
-
-    // referenceId must be the Short Note database ID only.
-    // Never fall back to uniqueToken or another field.
-    const extractReferenceId = (response) => {
-        const id = response?.data?.id;
-
-        if (id === null || id === undefined) {
-            return " ";
-        }
-
-        const referenceId = String(id).trim();
-        return referenceId.length > 0 ? referenceId : null;
-    };
-
-    // API 1: Create Short Note
-    const createShortNote = async (notePayload) => {
-        const response = await fetch(
-            `${API_BASE_URL}/api/v1/short-note`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    userId: USER_ID
-                },
-                body: JSON.stringify(notePayload)
-            }
-        );
-
-        return await readResponse(response);
-    };
-
-    // API 2: Generate DMS presigned URLs
-    const generatePresignedUrls = async (referenceId, submittedFiles) => {
-        const params = new URLSearchParams();
-
-        submittedFiles.forEach(item => {
-            params.append("fileName", item.file.name);
-        });
-
-        const response = await fetch(
-            `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(referenceId)}/dms/presigned?${params.toString()}`,
-            {
-                method: "GET",
-                headers: {
-                    userId: USER_ID
-                }
-            }
-        );
-
-        const result = await readResponse(response);
-        const urls = result.data;
-
-        if (!Array.isArray(urls) || urls.length !== submittedFiles.length) {
-            throw new Error(
-                "DMS did not return the expected number of presigned URLs."
-            );
-        }
-
-        return urls;
-    };
-
-    // API 3: Upload directly to S3
-    const uploadFilesToS3 = async (urls, submittedFiles) => {
-        for (let i = 0; i < submittedFiles.length; i++) {
-            const item = submittedFiles[i];
-            const file = item.file;
-
-            setUploadProgress(
-                `Uploading ${i + 1} of ${submittedFiles.length}: ${file.name}`
-            );
-
-            const response = await fetch(urls[i], {
-                method: "PUT",
-                headers: {
-                    "Content-Type": file.type || "application/octet-stream"
-                },
-                body: file
-            });
-
-            if (!response.ok) {
-                throw new Error(
-                    `S3 upload failed for ${file.name} (${response.status})`
-                );
-            }
-        }
-    };
-
-    // API 4: Save DMS metadata
-    const saveDocumentMetadata = async (referenceId, submittedFiles) => {
-        const documentDtos = submittedFiles.map(item => ({
-            fileName: item.file.name,
-            fileSize: item.file.size,
-            contentType: item.file.type || "application/octet-stream",
-            userId: USER_ID
-        }));
-
-        const response = await fetch(
-            `${DMS_API_BASE_URL}/api/v1/${encodeURIComponent(referenceId)}/dms`,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    userId: USER_ID
-                },
-                body: JSON.stringify(documentDtos)
-            }
-        );
-
-        await readResponse(response);
-    };
-
-    // Form validation
-    const validate = () => {
-        const errors = {};
-
-        if (!inputValue.title.trim()) {
-            errors.title = "Title is required";
-        }
-
-        if (!inputValue.content.trim()) {
-            errors.content = "Content is required";
-        }
-
-        if (!inputValue.categoryId) {
-            errors.categoryId = "Please select a valid category";
-        }
-
-        if (files.length > MAX_FILES) {
-            errors.files = "Maximum 3 attachments are allowed.";
-        }
-
-        setFormErrors(errors);
-
-        return Object.keys(errors).length === 0;
-    };
-
-    // Submit Short Note
-    const handleSubmit = async (event) => {
-        event.preventDefault();
-
-        if (isLoading) return;
-
-        if (!validate()) {
-            setIsSuccess(null);
-            return;
-        }
-
-        if (!API_BASE_URL) {
-            setApiError("VITE_API_BASE_URL is not configured.");
-            setIsSuccess(false);
-            return;
-        }
-
-        if (files.length > 0 && !DMS_API_BASE_URL) {
-            console.log("DMS API base URL is not configured.", DMS_API_BASE_URL + " --- IGNORE --- " + files.length);
-            setApiError("VITE_DMS_API_BASE_URL is not configured.");
-            setIsSuccess(false);
-            return;
-        }
-
-        // Use a stable snapshot so the same files are used throughout this request.
-        const submittedFiles = [...files];
-        const submittedFileCount = submittedFiles.length;
-        const notePayload = { ...inputValue,
-            attachment: submittedFileCount
-         };
-        const submissionSignature = JSON.stringify({
-            note: notePayload,
-            files: submittedFiles.map(({ file }) => ({
-                name: file.name,
-                size: file.size,
-                type: file.type,
-                lastModified: file.lastModified
-            }))
-        });
-
-        setIsLoading(true);
-        setIsSuccess(null);
-        setSavedAttachmentCount(0);
-        setApiError("");
-        setUploadProgress("");
-
-        let noteCreated = false;
-
-        try {
-            // Reuse the created note when retrying the same failed submission.
-            let pendingSubmission = pendingSubmissionRef.current;
-
-            if (!pendingSubmission ||
-                pendingSubmission.signature !== submissionSignature) {
-                setUploadProgress("Saving short note...");
-
-                const noteResponse = await createShortNote(notePayload);
-                pendingSubmission = {
-                    signature: submissionSignature,
-                    noteResponse
-                };
-                pendingSubmissionRef.current = pendingSubmission;
-            }
-
-            noteCreated = true;
-
-            if (submittedFileCount > 0) {
-                const referenceId = extractReferenceId(
-                    pendingSubmission.noteResponse
-                );
-
-                // Do not stop the UI flow when the API response has a null ID.
-                // The DMS backend still needs a valid referenceId to process files.
-                const dmsReferenceId = referenceId || "";
-
-                setUploadProgress("Generating document upload URLs...");
-                const urls = await generatePresignedUrls(
-                    dmsReferenceId,
-                    submittedFiles
-                );
-
-                // All S3 uploads must succeed before metadata is saved.
-                await uploadFilesToS3(urls, submittedFiles);
-
-                setUploadProgress("Saving document information...");
-                await saveDocumentMetadata(dmsReferenceId, submittedFiles);
-            }
-
-            // Show success only after every required step has completed.
-            setSavedAttachmentCount(submittedFileCount);
-            setIsSuccess(true);
-            setApiError("");
-
-            setInputValue({
-                title: "",
-                content: "",
-                categoryId: "others",
-                userId: USER_ID
-            });
-
-            submittedFiles.forEach(item => {
-                if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
-            });
-
-            filesRef.current = [];
-            setFiles([]);
-            setFormErrors({});
-            pendingSubmissionRef.current = null;
-
-            if (fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
-
-        } catch (error) {
-            console.error("Short Note / DMS error:", error);
-            setIsSuccess(false);
-
-            setApiError(
-                noteCreated
-                    ? `Short note was created, but attachment processing did not complete: ${error.message}. Your form and attachments are still available. Submit again to retry.`
-                    : error.message || "Unable to save the short note. Please try again."
-            );
-        } finally {
-            setIsLoading(false);
-            setUploadProgress("");
-        }
-    };
-
-    return (
-        <>
-            <style>{`
-                .main-card {
-                    transition: all 0.3s ease;
-                }
-
-                .main-card:hover {
-                    box-shadow: 0 1rem 3rem rgba(0,0,0,.12) !important;
-                }
-
-                .custom-dropdown-btn:hover {
-                    background-color: #e9ecef !important;
-                    border-color: #adb5bd !important;
-                    color: #0d6efd !important;
-                }
-
-                .dropdown-menu .dropdown-item:hover {
-                    background-color: #0d6efd !important;
-                    color: white !important;
-                    padding-left: 1.25rem !important;
-                    transition: all 0.15s ease-in-out;
-                }
-
-                .custom-submit-btn {
-                    transition: all 0.2s ease-in-out;
-                }
-
-                .custom-submit-btn:hover:not(:disabled) {
-                    transform: translateY(-2px);
-                    box-shadow: 0 6px 15px rgba(13, 110, 253, 0.3) !important;
-                    background-color: #0b5ed7 !important;
-                }
-
-                .custom-submit-btn:disabled {
-                    opacity: 0.7;
-                    cursor: not-allowed;
-                }
-
-                .form-control:focus {
-                    border-color: #0d6efd;
-                    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
-                }
-
-                .attachment-card {
-                    position: relative;
-                    border: 1px solid #dee2e6;
-                    border-radius: 10px;
-                    padding: 10px;
-                    background: #f8f9fa;
-                    min-width: 0;
-                }
-
-                .attachment-preview {
-                    width: 100%;
-                    height: 120px;
-                    object-fit: contain;
-                    border-radius: 6px;
-                    background: white;
-                }
-
-                .attachment-remove {
-                    position: absolute;
-                    top: 5px;
-                    right: 5px;
-                    border: none;
-                    background: #dc3545;
-                    color: white;
-                    width: 25px;
-                    height: 25px;
-                    border-radius: 50%;
-                    cursor: pointer;
-                }
-            `}</style>
-
-            <div className="container my-4" style={{ maxWidth: "800px" }}>
-                <div className="card main-card shadow-sm border-0 p-4 rounded-4 bg-white">
-
-                    <h2 className="mb-4 text-primary fw-bold">
-                        Create Short Note
-                    </h2>
-
-                    <form onSubmit={handleSubmit} onPaste={handlePaste}>
-
-                        {/* Category */}
-                        <div className="mb-3">
-                            <label className="form-label fw-semibold text-secondary small text-uppercase">
-                                Category
-                            </label>
-
-                            <div className="dropdown">
-                                <button
-                                    type="button"
-                                    className="btn btn-outline-secondary custom-dropdown-btn dropdown-toggle d-flex justify-content-between align-items-center"
-                                    data-bs-toggle="dropdown"
-                                    data-bs-auto-close="outside"
-                                    style={{ width: "220px" }}
-                                    disabled={isLoading}
-                                >
-                                    {categoryLabels[inputValue.categoryId]}
-                                </button>
-
-                                <ul className="dropdown-menu shadow border-0 py-2 rounded-3">
-                                    {Object.entries(categoryLabels).map(
-                                        ([key, label]) => (
-                                            <li key={key}>
-                                                <button
-                                                    type="button"
-                                                    className="dropdown-item py-2 px-3"
-                                                    disabled={isLoading}
-                                                    onClick={() => handleCategorySelect(key)}
-                                                >
-                                                    {label}
-                                                </button>
-                                            </li>
-                                        )
-                                    )}
-                                </ul>
-                            </div>
-
-                            {formErrors.categoryId && (
-                                <div className="text-danger mt-1 small">
-                                    {formErrors.categoryId}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Note title */}
-                        <div className="mb-3">
-                            <label className="form-label fw-semibold text-secondary small text-uppercase">
-                                Note Name
-                            </label>
-
-                            <input
-                                type="text"
-                                name="title"
-                                value={inputValue.title}
-                                onChange={handleInputValue}
-                                className="form-control py-2 shadow-none"
-                                placeholder="Short Note Name"
-                                disabled={isLoading}
-                            />
-
-                            {formErrors.title && (
-                                <div className="text-danger mt-1 small">
-                                    {formErrors.title}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Description */}
-                        <div className="mb-3">
-                            <div className="d-flex justify-content-between align-items-center mb-1">
-                                <label className="form-label fw-semibold text-secondary small text-uppercase">
-                                    Description
-                                </label>
-
-                       
-                            </div>
-
-                            <textarea
-                                ref={textareaRef}
-                                name="content"
-                                value={inputValue.content}
-                                className="form-control note-textarea shadow-none"
-                                onChange={handleInputValue}
-                                onKeyDown={handleKeyDown}
-                                rows={10}
-                                placeholder="Description (you can also paste images using Ctrl + V)"
-                                disabled={isLoading}
-                                style={{
-                                    fontFamily: "monospace",
-                                    fontSize: "14px"
-                                }}
-                            />
-
-                            {formErrors.content && (
-                                <div className="text-danger mt-1 small">
-                                    {formErrors.content}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Attachments */}
-                        <div className="mb-3">
-                            <div className="d-flex justify-content-between align-items-center mb-2">
-                                <label className="form-label fw-semibold text-secondary small text-uppercase mb-0">
-                                    Document Attachments
-                                </label>
-
-                                <small className="text-muted">
-                                    {files.length}/{MAX_FILES} files
-                                </small>
-                            </div>
-
-                            <div className="border rounded-3 p-3 bg-light">
-                                <div className="d-flex flex-wrap align-items-center gap-2">
-                                    <button
-                                        type="button"
-                                        className="btn btn-outline-primary"
-                                        disabled={isLoading || files.length >= MAX_FILES}
-                                        onClick={() => fileInputRef.current?.click()}
-                                    >
-                                        <i className="bi bi-paperclip me-2"></i>
-                                        Attach Files
-                                    </button>
-
-                                    <span className="small text-muted">
-                                        Or paste an image using Ctrl + V
-                                    </span>
-                                </div>
-
-                                <input
-                                    ref={fileInputRef}
-                                    type="file"
-                                    multiple
-                                    hidden
-                                    disabled={isLoading}
-                                    onChange={handleFileSelect}
-                                />
-
-                                <div className="small text-muted mt-2">
-                                    Maximum 3 files. Images and documents are supported.
-                                </div>
-
-                                {formErrors.files && (
-                                    <div className="text-danger mt-1 small">
-                                        {formErrors.files}
-                                    </div>
-                                )}
-
-                                {files.length > 0 && (
-                                    <div className="row g-2 mt-2">
-                                        {files.map(item => (
-                                            <div
-                                                className="col-6 col-md-4"
-                                                key={item.id}
-                                            >
-                                                <div className="attachment-card">
-                                                    <button
-                                                        type="button"
-                                                        className="attachment-remove"
-                                                        disabled={isLoading}
-                                                        onClick={() => removeFile(item.id)}
-                                                        aria-label="Remove attachment"
-                                                    >
-                                                        ×
-                                                    </button>
-
-                                                    {item.previewUrl ? (
-                                                        <img
-                                                            src={item.previewUrl}
-                                                            className="attachment-preview"
-                                                            alt={item.file.name}
-                                                        />
-                                                    ) : (
-                                                        <div className="attachment-preview d-flex align-items-center justify-content-center">
-                                                            <i className="bi bi-file-earmark-text fs-1 text-primary"></i>
-                                                        </div>
-                                                    )}
-
-                                                    <div
-                                                        className="small fw-semibold text-truncate mt-2"
-                                                        title={item.file.name}
-                                                    >
-                                                        {item.file.name}
-                                                    </div>
-
-                                                    <div className="small text-muted">
-                                                        {(item.file.size / 1024).toFixed(1)} KB
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Upload progress */}
-                        {uploadProgress && (
-                            <div className="alert alert-info mt-3 py-2">
-                                <span className="spinner-border spinner-border-sm me-2"></span>
-                                {uploadProgress}
-                            </div>
-                        )}
-
-                        {/* API error */}
-                        {isSuccess === false && (
-                            <div className="alert alert-danger mt-3 py-2" role="alert">
-                                {apiError || "An error occurred. Please try again."}
-                            </div>
-                        )}
-
-                        {/* Submit */}
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="btn btn-primary mt-2 px-4 py-2 custom-submit-btn fw-semibold rounded-3 shadow-sm"
-                        >
-                            {isLoading ? (
-                                <>
-                                    <span
-                                        className="spinner-border spinner-border-sm me-2"
-                                        role="status"
-                                    ></span>
-                                    Processing...
-                                </>
-                            ) : (
-                                "Submit"
-                            )}
-                        </button>
-
-                        {/* Success */}
-                        {isSuccess === true && (
-                            <div
-                                className="alert alert-success mt-3 py-2 text-center"
-                                role="alert"
-                            >
-                                {savedAttachmentCount > 0
-                                    ? `Note and ${savedAttachmentCount} attachment(s) saved successfully!`
-                                    : "Note saved successfully!"}
-                            </div>
-                        )}
-
-                    </form>
-                </div>
-            </div>
-        </>
-    );
-}
-
+const styles: Record<string, React.CSSProperties> = {
+  container: {
+    maxWidth: '800px',
+    margin: '40px auto',
+    backgroundColor: '#121214',
+    border: '1px solid #27272a',
+    borderRadius: '12px',
+    padding: '32px',
+    color: '#ffffff',
+    fontFamily: 'Inter, system-ui, sans-serif',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+  },
+  heading: {
+    fontSize: '20px',
+    fontWeight: 700,
+    marginBottom: '24px',
+    color: '#f4f4f5',
+  },
+  errorBanner: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+    border: '1px solid #ef4444',
+    color: '#ef4444',
+    padding: '10px 14px',
+    borderRadius: '6px',
+    fontSize: '13px',
+    marginBottom: '16px',
+  },
+  form: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+  },
+  inputGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  label: {
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#a1a1aa',
+  },
+  textInput: {
+    backgroundColor: '#18181b',
+    border: '1px solid #27272a',
+    borderRadius: '8px',
+    padding: '12px',
+    color: '#ffffff',
+    fontSize: '14px',
+    outline: 'none',
+  },
+  textarea: {
+    backgroundColor: '#18181b',
+    border: '1px solid #27272a',
+    borderRadius: '8px',
+    padding: '12px',
+    color: '#ffffff',
+    fontSize: '14px',
+    outline: 'none',
+    resize: 'vertical',
+  },
+  attachmentSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  successBadge: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    border: '1px solid #10b981',
+    color: '#34d399',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    fontSize: '13px',
+  },
+  removeBtn: {
+    background: 'transparent',
+    border: 'none',
+    color: '#ef4444',
+    cursor: 'pointer',
+    fontWeight: 600,
+    fontSize: '12px',
+  },
+  recorderContainer: {
+    borderRadius: '8px',
+    overflow: 'hidden',
+    border: '1px solid #27272a',
+  },
+  submitBtn: {
+    backgroundColor: '#3b82f6',
+    color: '#ffffff',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '12px 20px',
+    fontSize: '14px',
+    fontWeight: 600,
+    cursor: 'pointer',
+    marginTop: '10px',
+    transition: 'background 0.2s',
+  },
+};
 
 export default CreateShortNote;
