@@ -25,6 +25,16 @@ public class ShortNoteEntity extends BaseEntity {
     private Integer attachement;
     private String path;
 
+    public String getSource() {
+        return source;
+    }
+
+    public void setSource(String source) {
+        this.source = source;
+    }
+
+    private String source;
+
     public String getPath() {
         return path;
     }

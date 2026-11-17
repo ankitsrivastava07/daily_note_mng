@@ -1,4 +1,4 @@
-package com.daily_note_dms.documents.repository;
+package com.daily_note_dms.documents.video.repo;
 
 import com.daily_note_dms.documents.video.entity.VideoRecording;
 import org.springframework.stereotype.Repository;

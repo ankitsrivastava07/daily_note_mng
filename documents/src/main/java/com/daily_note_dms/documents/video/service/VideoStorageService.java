@@ -1,16 +1,19 @@
-package com.daily_note_dms.documents.service;
+package com.daily_note_dms.documents.video.service;
 
 import com.daily_note_dms.documents.dto.PreSignedUrlResponse;
 import com.daily_note_dms.documents.dto.VideoUploadRequest;
-import com.daily_note_dms.documents.exception.VideoNotFoundException;
-import com.daily_note_dms.documents.repository.VideoRepository;
+import com.daily_note_dms.documents.globalExceptionHandler.exception.VideoNotFoundException;
 import com.daily_note_dms.documents.video.entity.VideoRecording;
+import com.daily_note_dms.documents.video.repo.VideoRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+import software.amazon.awssdk.services.s3.presigner.model.PresignedGetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
@@ -23,6 +26,7 @@ public class VideoStorageService {
 
     private final S3Presigner s3Presigner;
     private final VideoRepository videoRepository;
+    private final Logger logger = LoggerFactory.getLogger(VideoStorageService.class);
 
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
@@ -33,19 +37,25 @@ public class VideoStorageService {
     }
 
     public PreSignedUrlResponse initiateVideoUpload(VideoUploadRequest req) {
-        String videoId = UUID.randomUUID().toString();
-        String s3Key = String.format("recordings/%s/%s.webm", req.getReferenceId(), videoId);
+        logger.info("Initiating Video Upload Request for user: {}", req.getUserId());
 
-        // Save initial PENDING record
+        String videoId = UUID.randomUUID().toString();
+        // S3 path structure with userId
+        String s3Key = String.format("video_recordings/%s/%s/%s.webm", req.getUserId(), req.getReferenceId(), videoId);
+
+        // 1. Save initial PENDING record in DynamoDB
         VideoRecording entity = new VideoRecording();
         entity.setVideoId(videoId);
         entity.setReferenceId(req.getReferenceId());
+        entity.setUserId(req.getUserId());
         entity.setS3Key(s3Key);
         entity.setMimeType(req.getMimeType());
         entity.setStatus("PENDING");
         videoRepository.save(entity);
 
-        // Generate 15-min PUT URL
+        logger.info("Saved PENDING record in DB with videoId: {}", videoId);
+
+        // 2. Generate 15-min PUT Pre-signed URL (matching Content-Type)
         PutObjectRequest objectRequest = PutObjectRequest.builder()
                 .bucket(bucketName)
                 .key(s3Key)
@@ -62,9 +72,26 @@ public class VideoStorageService {
         return new PreSignedUrlResponse(videoId, presignedRequest.url().toString(), s3Key);
     }
 
+    public String getPresignedViewUrl(String s3Key) {
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(bucketName)
+                .key(s3Key)
+                .build();
+
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(Duration.ofMinutes(15))
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        PresignedGetObjectRequest presignedRequest = s3Presigner.presignGetObject(presignRequest);
+        return presignedRequest.url().toString();
+    }
+
     public void markUploadComplete(String videoId, Long fileSize, Integer duration) {
+        logger.info("Marking Video Upload Complete: {}", videoId);
         VideoRecording entity = Optional.ofNullable(videoRepository.findById(videoId))
                 .orElseThrow(() -> new VideoNotFoundException("Video record not found"));
+        logger.info("Marking Video Upload Complete: {}", videoId);
         entity.setFileSizeBytes(fileSize);
         entity.setDurationSeconds(duration);
         entity.setStatus("READY");
@@ -72,8 +99,11 @@ public class VideoStorageService {
     }
 
     public String generatePlaybackUrl(String videoId) {
+        logger.info("Generating Playback Url for Video: {}", videoId);
         VideoRecording entity = Optional.ofNullable(videoRepository.findById(videoId))
                 .orElseThrow(() -> new VideoNotFoundException("Video not found"));
+
+        logger.info("Generating presigned GET URL for videoId: {} with S3 key: {}", videoId, entity.getS3Key());
 
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
                 .bucket(bucketName)
