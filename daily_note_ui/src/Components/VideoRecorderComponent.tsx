@@ -164,7 +164,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             audio: {
               echoCancellation: false,
               noiseSuppression: false,
-              autoGainCount: false,
+              autoGainControl: false,
             } as any,
             selfBrowserSurface: 'exclude',
           };
@@ -191,13 +191,13 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             }
           };
         } else {
-          // Audio constraints configured to prevent background speaker / YouTube ducking/muting
+          // Audio constraints set to false to prevent YouTube/background speaker ducking or muting
           const constraints: MediaStreamConstraints = {
             video: deviceId
               ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } }
               : rearPreferred
-              ? { facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-              : { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
+                ? { facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
+                : { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
             audio: {
               echoCancellation: false,
               noiseSuppression: false,
@@ -289,7 +289,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       };
       if (capabilities.zoom) {
         const hwZoom = Math.min(capabilities.zoom.max, Math.max(capabilities.zoom.min, clamped));
-        videoTrack.applyConstraints({ advanced: [{ zoom: hwZoom } as MediaTrackConstraintSet] }).catch(() => {});
+        videoTrack.applyConstraints({ advanced: [{ zoom: hwZoom } as MediaTrackConstraintSet] }).catch(() => { });
       }
     }
   };
@@ -325,8 +325,8 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
         ? 'video/webm;codecs=vp9,opus'
         : MediaRecorder.isTypeSupported('video/webm')
-        ? 'video/webm'
-        : 'video/mp4';
+          ? 'video/webm'
+          : 'video/mp4';
 
       const recorder = new MediaRecorder(streamRef.current, { mimeType });
       mediaRecorderRef.current = recorder;
@@ -424,8 +424,8 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       const presignedUrl: string | undefined = Array.isArray(payload.data)
         ? payload.data[0]
         : Array.isArray(payload)
-        ? payload[0]
-        : undefined;
+          ? payload[0]
+          : undefined;
 
       if (!presignedUrl) {
         throw new Error('Pre-signed URL missing in DMS response.');
