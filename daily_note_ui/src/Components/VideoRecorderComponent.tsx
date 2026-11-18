@@ -11,6 +11,11 @@ type StreamState = 'IDLE' | 'PREVIEW_LIVE' | 'RECORDING' | 'REVIEW' | 'UPLOADING
 type SourceMode = 'CAMERA' | 'SCREEN';
 type VideoResolution = '720P' | '1080P' | '4K';
 const DEFAULT_USER_ID = "ankit0397";
+const videoConstraints = {
+  width: { ideal: 1920, max: 3840 },
+  height: { ideal: 1080, max: 2160 },
+  frameRate: { ideal: 30, max: 60 }
+};
 
 const Icons = {
   MicOn: () => (
