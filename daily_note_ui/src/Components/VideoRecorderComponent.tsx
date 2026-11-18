@@ -137,7 +137,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   const liveVideoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  
+
   // Storage arrays for long session chunking
   const allRecordedChunksRef = useRef<Blob[]>([]);
   const currentBatchChunksRef = useRef<Blob[]>([]);
@@ -382,11 +382,11 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           ? 'video/webm'
           : 'video/mp4';
 
-      const recorder = new MediaRecorder(streamRef.current, { 
+      const recorder = new MediaRecorder(streamRef.current, {
         mimeType,
         videoBitsPerSecond: 4000000 // Optimized 4 Mbps bitrate for pristine long recordings
       });
-      
+
       mediaRecorderRef.current = recorder;
       allRecordedChunksRef.current = [];
       currentBatchChunksRef.current = [];
@@ -406,7 +406,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           if (currentBatchSizeRef.current >= TARGET_CHUNK_SIZE) {
             const batchBlob = new Blob(currentBatchChunksRef.current, { type: mimeType });
             uploadChunkToS3(batchBlob, partCounter++, baseFileName);
-            
+
             // Reset batch buffer
             currentBatchChunksRef.current = [];
             currentBatchSizeRef.current = 0;
@@ -497,7 +497,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     const hours = Math.floor(totalSeconds / 3600);
     const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
     const secs = (totalSeconds % 60).toString().padStart(2, '0');
-    return hours >رياض ? `${hours}:${mins}:${secs}` : `${mins}:${secs}`;
+    return hours > 0 ? `${hours}:${mins}:${secs}` : `${mins}:${secs}`;
   };
 
   const isVideoHidden = isCameraOff || sourceMode === 'SCREEN';
