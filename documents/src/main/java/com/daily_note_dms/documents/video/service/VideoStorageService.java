@@ -18,6 +18,7 @@ import software.amazon.awssdk.services.s3.presigner.model.PresignedPutObjectRequ
 import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -45,7 +46,7 @@ public class VideoStorageService {
 
         // 1. Save initial PENDING record in DynamoDB
         VideoRecording entity = new VideoRecording();
-        entity.setVideoId(videoId);
+        entity.setId(videoId);
         entity.setReferenceId(req.getReferenceId());
         entity.setUserId(req.getUserId());
         entity.setS3Key(s3Key);
@@ -98,9 +99,9 @@ public class VideoStorageService {
         videoRepository.save(entity);
     }
 
-    public String generatePlaybackUrl(String videoId) {
+    public String generatePlaybackUrl(String videoId, String userId) {
         logger.info("Generating Playback Url for Video: {}", videoId);
-        VideoRecording entity = Optional.ofNullable(videoRepository.findById(videoId))
+        VideoRecording entity = Optional.ofNullable(videoRepository.findById(videoId, userId))
                 .orElseThrow(() -> new VideoNotFoundException("Video not found"));
 
         logger.info("Generating presigned GET URL for videoId: {} with S3 key: {}", videoId, entity.getS3Key());
@@ -111,10 +112,30 @@ public class VideoStorageService {
                 .build();
 
         GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
-                .signatureDuration(Duration.ofHours(1))
+                .signatureDuration(Duration.ofMinutes(15))
                 .getObjectRequest(getObjectRequest)
                 .build();
 
         return s3Presigner.presignGetObject(presignRequest).url().toString();
+    }
+
+    public List<VideoRecording> findByUserId(String userId) {
+        return videoRepository.findByUserId(userId);
+    }
+
+    public void save(VideoRecording record) {
+        videoRepository.save(record);
+    }
+
+    public VideoRecording findById(String id) {
+        return videoRepository.getItem(id).orElse(null);
+    }
+
+    public VideoRecording findById(String id, String userId) {
+        return videoRepository.getItem(id).orElse(null);
+    }
+
+    public void deleteVideoById(String videoId, String userId) {
+        videoRepository.deleteById(videoId, userId);
     }
 }

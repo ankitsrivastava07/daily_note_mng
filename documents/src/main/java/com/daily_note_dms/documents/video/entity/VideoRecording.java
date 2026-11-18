@@ -1,8 +1,6 @@
 package com.daily_note_dms.documents.video.entity;
 
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 @DynamoDbBean
 public class VideoRecording {
@@ -17,6 +15,8 @@ public class VideoRecording {
     private String createdAt;
     private String userId;
 
+    @DynamoDbSortKey
+    @DynamoDbAttribute("id")
     public String getId() {
         return id;
     }
@@ -25,6 +25,9 @@ public class VideoRecording {
         this.id = id;
     }
 
+    @DynamoDbPartitionKey
+    @DynamoDbSecondaryPartitionKey(indexNames = "UserIdIndex")
+    @DynamoDbAttribute("user_id")
     public String getUserId() {
         return userId;
     }
@@ -33,16 +36,8 @@ public class VideoRecording {
         this.userId = userId;
     }
 
-    @DynamoDbPartitionKey
-    public String getVideoId() {
-        return id;
-    }
-
-    public void setVideoId(String videoId) {
-        this.id = videoId;
-    }
-
     @DynamoDbSecondaryPartitionKey(indexNames = "ReferenceIndex")
+    @DynamoDbAttribute("reference_id")
     public String getReferenceId() {
         return referenceId;
     }
