@@ -11,11 +11,6 @@ type StreamState = 'IDLE' | 'PREVIEW_LIVE' | 'RECORDING' | 'REVIEW' | 'UPLOADING
 type SourceMode = 'CAMERA' | 'SCREEN';
 type VideoResolution = '720P' | '1080P' | '4K';
 const DEFAULT_USER_ID = "ankit0397";
-const videoConstraints = {
-  width: { ideal: 1920, max: 3840 },
-  height: { ideal: 1080, max: 2160 },
-  frameRate: { ideal: 30, max: 60 }
-};
 
 const Icons = {
   MicOn: () => (
@@ -136,7 +131,6 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   const [reviewUrl, setReviewUrl] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Notification state safely inside component
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | null } | null>(null);
 
   const studioContainerRef = useRef<HTMLDivElement | null>(null);
@@ -174,9 +168,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           const displayOptions: DisplayMediaStreamOptions & { selfBrowserSurface?: string } = {
             video: { frameRate: { ideal: 30 } },
             audio: {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
             } as any,
             selfBrowserSurface: 'exclude',
           };
@@ -185,7 +179,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
           try {
             const micStream = await navigator.mediaDevices.getUserMedia({
-              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
+              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
             });
             stream = new MediaStream([
               ...displayStream.getVideoTracks(),
@@ -214,12 +208,12 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             video: deviceId
               ? { deviceId: { exact: deviceId }, ...videoConstraints }
               : rearPreferred
-                ? { facingMode: 'environment', ...videoConstraints } // 👈 Yahan se '{ exact: ... }' hata ke sirf string rakh di hai
+                ? { facingMode: 'environment', ...videoConstraints }
                 : { facingMode: 'user', ...videoConstraints },
             audio: {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
             },
           };
 
@@ -228,7 +222,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           } catch {
             stream = await navigator.mediaDevices.getUserMedia({
               video: videoConstraints,
-              audio: { echoCancellation: false, noiseSuppression: false },
+              audio: { echoCancellation: true, noiseSuppression: true },
             });
           }
         }
@@ -416,12 +410,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     URL.revokeObjectURL(url);
   };
 
-  // Asynchronous Background Upload Function to prevent UI freeze and audio lags
   const uploadToS3InBackground = async (blobToUpload: Blob, generatedFileName: string) => {
     try {
-      const ext = blobToUpload.type.includes('mp4') ? 'mp4' : 'webm';
       const mimeType = blobToUpload.type || 'video/webm';
-
       const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
       const userId = localStorage.getItem("userId") || DEFAULT_USER_ID;
 
@@ -481,14 +472,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     const prefix = sourceMode === 'SCREEN' ? 'screen_capture' : 'mountain_capture';
     const fileName = `${prefix}_${Date.now()}.${ext}`;
 
-    // Switch view immediately and let upload happen in background asynchronously
     setStreamState('PREVIEW_LIVE');
     setNotification({ message: 'Uploading recording in background to S3...', type: 'success' });
-
-    // Trigger async background upload without blocking UI
     uploadToS3InBackground(videoBlob, fileName);
-
-    // Reset camera state for next recording
     handleDiscardAndRestart();
   };
 
@@ -506,7 +492,6 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       ref={studioContainerRef}
       className={`vrc-shell ${isFullView ? 'vrc-shell--full' : 'vrc-shell--compact'}`}
     >
-      {/* Toast Notification Banner */}
       {notification && (
         <div style={{
           position: 'fixed',
