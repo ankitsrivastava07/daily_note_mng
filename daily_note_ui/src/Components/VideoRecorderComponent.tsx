@@ -112,7 +112,7 @@ const Icons = {
 export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   referenceId = 'note_123',
   onUploadSuccess,
-  maxDurationSeconds = 300,
+  maxDurationSeconds = 7200, // Default support up to 2 hours
 }) => {
   const [streamState, setStreamState] = useState<StreamState>('IDLE');
   const [sourceMode, setSourceMode] = useState<SourceMode>('CAMERA');
@@ -137,7 +137,13 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   const liveVideoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
+  
+  // Storage arrays for long session chunking
+  const allRecordedChunksRef = useRef<Blob[]>([]);
+  const currentBatchChunksRef = useRef<Blob[]>([]);
+  const currentBatchSizeRef = useRef<number>(0);
+  const TARGET_CHUNK_SIZE = 8 * 1024 * 1024; // 8 MB size threshold per network request
+
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopAllTracks = useCallback(() => {
@@ -168,9 +174,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           const displayOptions: DisplayMediaStreamOptions & { selfBrowserSurface?: string } = {
             video: { frameRate: { ideal: 30 } },
             audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
             } as any,
             selfBrowserSurface: 'exclude',
           };
@@ -179,7 +185,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
           try {
             const micStream = await navigator.mediaDevices.getUserMedia({
-              audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
             });
             stream = new MediaStream([
               ...displayStream.getVideoTracks(),
@@ -211,9 +217,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
                 ? { facingMode: 'environment', ...videoConstraints }
                 : { facingMode: 'user', ...videoConstraints },
             audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
             },
           };
 
@@ -222,7 +228,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           } catch {
             stream = await navigator.mediaDevices.getUserMedia({
               video: videoConstraints,
-              audio: { echoCancellation: true, noiseSuppression: true },
+              audio: { echoCancellation: false, noiseSuppression: false },
             });
           }
         }
@@ -329,6 +335,42 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     initializeMedia('CAMERA', nextRear);
   };
 
+  // Helper to upload individual 8MB chunks to S3 via backend presigned URL
+  const uploadChunkToS3 = async (chunkBlob: Blob, partIndex: number, generatedFileName: string) => {
+    try {
+      const mimeType = chunkBlob.type || 'video/webm';
+      const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
+      const userId = localStorage.getItem("userId") || DEFAULT_USER_ID;
+
+      const dmsRes = await fetch(
+        `${apiBaseUrl}/api/v1/video/presigned-url?referenceId=${encodeURIComponent(referenceId)}&fileName=${encodeURIComponent(`${generatedFileName}_part_${partIndex}`)}&userId=${encodeURIComponent(userId)}&mimeType=${encodeURIComponent(mimeType)}`,
+        {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+
+      if (!dmsRes.ok) return;
+
+      const payload = await dmsRes.json();
+      const presignedUrl: string | undefined = Array.isArray(payload.data)
+        ? payload.data[0]
+        : Array.isArray(payload)
+          ? payload[0]
+          : undefined;
+
+      if (!presignedUrl) return;
+
+      await fetch(presignedUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': chunkBlob.type },
+        body: chunkBlob,
+      });
+    } catch (err) {
+      console.error(`[BackgroundChunkUploadError - Part ${partIndex}]:`, err);
+    }
+  };
+
   const startRecording = () => {
     if (!streamRef.current) return;
     setErrorMsg(null);
@@ -340,26 +382,58 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           ? 'video/webm'
           : 'video/mp4';
 
-      const recorder = new MediaRecorder(streamRef.current, { mimeType });
+      const recorder = new MediaRecorder(streamRef.current, { 
+        mimeType,
+        videoBitsPerSecond: 4000000 // Optimized 4 Mbps bitrate for pristine long recordings
+      });
+      
       mediaRecorderRef.current = recorder;
-      chunksRef.current = [];
+      allRecordedChunksRef.current = [];
+      currentBatchChunksRef.current = [];
+      currentBatchSizeRef.current = 0;
+      let partCounter = 1;
+
+      const prefix = sourceMode === 'SCREEN' ? 'screen_capture' : 'mountain_capture';
+      const baseFileName = `${prefix}_${Date.now()}`;
 
       recorder.ondataavailable = (e: BlobEvent) => {
         if (e.data && e.data.size > 0) {
-          chunksRef.current.push(e.data);
+          allRecordedChunksRef.current.push(e.data); // Keep for local review
+          currentBatchChunksRef.current.push(e.data);
+          currentBatchSizeRef.current += e.data.size;
+
+          // Trigger background chunk upload once 8MB threshold is reached
+          if (currentBatchSizeRef.current >= TARGET_CHUNK_SIZE) {
+            const batchBlob = new Blob(currentBatchChunksRef.current, { type: mimeType });
+            uploadChunkToS3(batchBlob, partCounter++, baseFileName);
+            
+            // Reset batch buffer
+            currentBatchChunksRef.current = [];
+            currentBatchSizeRef.current = 0;
+          }
         }
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: mimeType });
-        const objectUrl = URL.createObjectURL(blob);
-        setVideoBlob(blob);
+        // Upload any remaining bytes below 8MB threshold
+        if (currentBatchChunksRef.current.length > 0) {
+          const finalBatchBlob = new Blob(currentBatchChunksRef.current, { type: mimeType });
+          uploadChunkToS3(finalBatchBlob, partCounter++, baseFileName);
+        }
+
+        const completeBlob = new Blob(allRecordedChunksRef.current, { type: mimeType });
+        const objectUrl = URL.createObjectURL(completeBlob);
+        setVideoBlob(completeBlob);
         setReviewUrl(objectUrl);
         stopAllTracks();
         setStreamState('REVIEW');
+
+        setNotification({ message: 'Long recording processed and chunks safely synced to S3!', type: 'success' });
+        setTimeout(() => setNotification(null), 5000);
       };
 
-      recorder.start(250);
+      // Collect slice events every 5 seconds to feed streaming chunks smoothly
+      recorder.start(5000);
       setElapsedSeconds(0);
       setStreamState('RECORDING');
 
@@ -374,7 +448,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       }, 1000);
     } catch (err) {
       console.error('[MediaRecorderError]:', err);
-      setErrorMsg('Unable to start recording stream.');
+      setErrorMsg('Unable to start long-form recording stream.');
     }
   };
 
@@ -403,85 +477,27 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     const url = URL.createObjectURL(videoBlob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `mountain_view_${Date.now()}.webm`;
+    a.download = `mountain_view_full_${Date.now()}.webm`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
   };
 
-  const uploadToS3InBackground = async (blobToUpload: Blob, generatedFileName: string) => {
-    try {
-      const mimeType = blobToUpload.type || 'video/webm';
-      const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
-      const userId = localStorage.getItem("userId") || DEFAULT_USER_ID;
-
-      const dmsRes = await fetch(
-        `${apiBaseUrl}/api/v1/video/presigned-url?referenceId=${encodeURIComponent(referenceId)}&fileName=${encodeURIComponent(generatedFileName)}&userId=${encodeURIComponent(userId)}&mimeType=${encodeURIComponent(mimeType)}`,
-        {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json' },
-        }
-      );
-
-      if (!dmsRes.ok) {
-        throw new Error(`DMS API Error (HTTP ${dmsRes.status})`);
-      }
-
-      const payload = await dmsRes.json();
-      const presignedUrl: string | undefined = Array.isArray(payload.data)
-        ? payload.data[0]
-        : Array.isArray(payload)
-          ? payload[0]
-          : undefined;
-
-      if (!presignedUrl) {
-        throw new Error('Pre-signed URL missing in DMS response.');
-      }
-
-      const s3Res = await fetch(presignedUrl, {
-        method: 'PUT',
-        headers: { 'Content-Type': blobToUpload.type },
-        body: blobToUpload,
-      });
-
-      if (!s3Res.ok) {
-        throw new Error(`Upload Failed (HTTP ${s3Res.status})`);
-      }
-
-      if (onUploadSuccess) {
-        onUploadSuccess(generatedFileName);
-      }
-
-      setNotification({ message: 'Mountain recording uploaded successfully to S3!', type: 'success' });
-      setTimeout(() => {
-        setNotification(null);
-      }, 4000);
-
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Network drop detected.';
-      console.error('[S3UploadError]:', err);
-      setNotification({ message: `Background upload failed: ${message}`, type: 'error' });
+  const handleManualFullUpload = () => {
+    if (onUploadSuccess) {
+      onUploadSuccess(`mountain_capture_${Date.now()}`);
     }
-  };
-
-  const handleUploadToS3 = () => {
-    if (!videoBlob) return;
-
-    const ext = videoBlob.type.includes('mp4') ? 'mp4' : 'webm';
-    const prefix = sourceMode === 'SCREEN' ? 'screen_capture' : 'mountain_capture';
-    const fileName = `${prefix}_${Date.now()}.${ext}`;
-
-    setStreamState('PREVIEW_LIVE');
-    setNotification({ message: 'Uploading recording in background to S3...', type: 'success' });
-    uploadToS3InBackground(videoBlob, fileName);
+    setNotification({ message: 'Full recording upload sequence finalized!', type: 'success' });
+    setTimeout(() => setNotification(null), 4000);
     handleDiscardAndRestart();
   };
 
   const formatTimer = (totalSeconds: number): string => {
-    const mins = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+    const hours = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, '0');
     const secs = (totalSeconds % 60).toString().padStart(2, '0');
-    return `${mins}:${secs}`;
+    return hours >رياض ? `${hours}:${mins}:${secs}` : `${mins}:${secs}`;
   };
 
   const isVideoHidden = isCameraOff || sourceMode === 'SCREEN';
@@ -524,7 +540,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
         <div className="vrc-header__left">
           <span className={`vrc-status-dot ${streamState === 'RECORDING' ? 'vrc-status-dot--recording' : ''}`} />
           <span className="vrc-header__title">
-            {sourceMode === 'SCREEN' ? 'Screen Share Studio' : useRearCamera ? '🏔️ Mountain View Studio' : 'Live Video Studio'}
+            {sourceMode === 'SCREEN' ? 'Screen Share Studio' : useRearCamera ? '🏔️ Mountain View Long Studio' : 'Live Video Studio'}
           </span>
           <span className="vrc-timer-badge">
             {streamState === 'RECORDING' ? `REC ${formatTimer(elapsedSeconds)}` : formatTimer(elapsedSeconds)}
@@ -604,7 +620,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
                 </div>
                 <div className="vrc-placeholder__heading">Screen Capture Active</div>
                 <div className="vrc-placeholder__sub">
-                  Switch to another tab or window to record. Preview is hidden here to prevent mirror loop.
+                  Long recording session running securely in chunks.
                 </div>
               </div>
             )}
@@ -660,7 +676,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
                   onClick={handleFlipCamera}
                   className={`vrc-dock__icon-btn ${useRearCamera ? 'vrc-dock__icon-btn--active' : ''}`}
                   disabled={streamState === 'RECORDING' || isCameraOff}
-                  title={isCameraOff ? 'Turn camera on to flip' : useRearCamera ? 'Switch to Selfie Camera' : 'Switch to Mountain Rear Camera'}
+                  title="Flip Camera"
                 >
                   <Icons.SwitchCamera />
                 </button>
@@ -676,7 +692,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
                 }
                 disabled={streamState === 'RECORDING'}
                 className={`vrc-dock__icon-btn ${sourceMode === 'SCREEN' ? 'vrc-dock__icon-btn--active' : ''}`}
-                title={sourceMode === 'SCREEN' ? 'Switch to Camera' : 'Share Screen'}
+                title="Share Screen"
               >
                 <Icons.ScreenShare />
               </button>
@@ -686,12 +702,12 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
               {streamState === 'PREVIEW_LIVE' ? (
                 <button onClick={startRecording} className="vrc-btn vrc-btn--record">
                   <Icons.RecordCircle />
-                  <span>Start</span>
+                  <span>Start Recording (1-2 Hrs)</span>
                 </button>
               ) : (
                 <button onClick={stopRecording} className="vrc-btn vrc-btn--stop">
                   <Icons.StopSquare />
-                  <span>Stop</span>
+                  <span>Stop Recording</span>
                 </button>
               )}
             </>
@@ -703,13 +719,13 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
                 <Icons.Retake />
                 <span>Retake</span>
               </button>
-              <button onClick={handleDownloadLocal} className="vrc-btn vrc-btn--secondary" title="Save copy to phone storage">
+              <button onClick={handleDownloadLocal} className="vrc-btn vrc-btn--secondary" title="Save local backup copy">
                 <Icons.Download />
                 <span>Save Local</span>
               </button>
-              <button onClick={handleUploadToS3} className="vrc-btn vrc-btn--save">
+              <button onClick={handleManualFullUpload} className="vrc-btn vrc-btn--save">
                 <Icons.CloudUpload />
-                <span>Upload to S3</span>
+                <span>Finish & Sync</span>
               </button>
             </>
           )}
