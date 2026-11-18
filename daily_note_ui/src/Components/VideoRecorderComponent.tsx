@@ -209,7 +209,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             video: deviceId
               ? { deviceId: { exact: deviceId }, ...videoConstraints }
               : rearPreferred
-                ? { facingMode: { exact: 'environment' }, ...videoConstraints }
+                ? { facingMode: 'environment', ...videoConstraints } // 👈 Yahan se '{ exact: ... }' hata ke sirf string rakh di hai
                 : { facingMode: 'user', ...videoConstraints },
             audio: {
               echoCancellation: false,

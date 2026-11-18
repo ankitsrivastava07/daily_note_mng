@@ -19,10 +19,13 @@ import VideoRecorderComponent from './Components/VideoRecorderComponent';
 import LiveStreamComponent from './Components/LiveStreamComponent';
 import ShortNoteView from './Components/ShortNoteView';
 import ShortNoteUpdate from './Components/ShortNoteUpdate';
+import { VideoListModal } from './Components/VideoListModal'; // Naya component jo abhi banaya tha
 
 function App() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const DEFAULT_USER_ID = "ankit0397";
+  const userId = localStorage.getItem("userId") || DEFAULT_USER_ID;
 
   const closeAll = () => {
     setActiveDropdown(null);
@@ -44,9 +47,9 @@ function App() {
           </Link>
 
           {/* Mobile Hamburger Toggle Button */}
-          <button 
+          <button
             className="tcs-mobile-toggle"
-            style={tcsNavStyles.mobileToggleBtn} 
+            style={tcsNavStyles.mobileToggleBtn}
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle Menu"
           >
@@ -131,6 +134,7 @@ function App() {
                     <h4 style={tcsNavStyles.columnHeading}>Capture & Stream Studios</h4>
                     <Link to="/camera-upload" style={tcsNavStyles.subLink} onClick={closeAll}>📸 Capture & Attach</Link>
                     <Link to="/video-recorder" style={tcsNavStyles.subLink} onClick={closeAll}>🎥 Mountain Video Recorder</Link>
+                    <Link to="/video-library" style={tcsNavStyles.subLink} onClick={closeAll}>📂 Video Library & Playback</Link>
                     <Link to="/live-stream" style={tcsNavStyles.subLink} onClick={closeAll}>📡 Live Broadcaster Studio</Link>
                   </div>
                 </div>
@@ -159,6 +163,7 @@ function App() {
           <Route path="/today-task" element={<TodayTask />} />
           <Route path="/get-all-tasks" element={<GetAllTask />} />
           <Route path="/video-recorder" element={<VideoRecorderComponent />} />
+          <Route path="/video-library" element={<VideoListModal userId={userId} />} />
           <Route path="/live-stream" element={<LiveStreamComponent />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
