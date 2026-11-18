@@ -174,9 +174,14 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           const displayOptions: DisplayMediaStreamOptions & { selfBrowserSurface?: string } = {
             video: { frameRate: { ideal: 30 } },
             audio: {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+              // @ts-ignore - Browser specific flags to prevent system audio ducking
+              googEchoCancellation: true,
+              googAutoGainControl: false,
+              googNoiseSuppression: true,
+              googHighpassFilter: true
             } as any,
             selfBrowserSurface: 'exclude',
           };
@@ -702,7 +707,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
               {streamState === 'PREVIEW_LIVE' ? (
                 <button onClick={startRecording} className="vrc-btn vrc-btn--record">
                   <Icons.RecordCircle />
-                  <span>Start Recording (1-2 Hrs)</span>
+                  <span>Start</span>
                 </button>
               ) : (
                 <button onClick={stopRecording} className="vrc-btn vrc-btn--stop">

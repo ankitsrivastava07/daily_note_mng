@@ -31,7 +31,7 @@ export const VideoListModal: React.FC<{ userId: string }> = ({ userId }) => {
         const res = await fetch(`${apiBaseUrl}/api/v1/video/list/${userId}`);
         const data = await res.json();
         const fetchedList = Array.isArray(data) ? data : data.data || [];
-        
+
         // Cache mein store kar lo
         clientVideoCache[userId] = fetchedList;
         setVideos(fetchedList);
@@ -63,12 +63,12 @@ export const VideoListModal: React.FC<{ userId: string }> = ({ userId }) => {
   // 3. Delete Video Handler (UI se bhi hatega aur Cache se bhi update hoga)
   const handleDeleteVideo = async (videoId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Taaki video play na khul jaye click par
-    if (!window.confirm("Bhai, pakka is video ko delete karna hai?")) return;
+    if (!window.confirm("Are you sure you want to delete this video ?")) return;
 
     try {
       const currentUserId = localStorage.getItem("userId") || userId;
       const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
-      
+
       const res = await fetch(`${apiBaseUrl}/api/v1/video/${videoId}?userId=${currentUserId}`, {
         method: 'DELETE',
       });
