@@ -404,7 +404,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
       setFinalVideoUrl(mergedUrl);
       setStreamState('REVIEW');
-      setNotification({ message: 'Video is ready !', type: 'success' });
+      setNotification({ message: 'Video ready hai aur play ho rahi hai!', type: 'success' });
       setTimeout(() => setNotification(null), 4000);
 
       if (onUploadSuccess) {
