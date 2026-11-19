@@ -12,7 +12,7 @@ type SourceMode = 'CAMERA' | 'SCREEN';
 type VideoResolution = '720P' | '1080P' | '4K';
 
 const DEFAULT_USER_ID = 'ankit0397';
-const TARGET_CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB per chunk
+const TARGET_CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB OOM-safe buffer threshold
 const MAX_RETRIES = 3;
 
 const Icons = {
@@ -300,7 +300,6 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     initializeMedia('CAMERA', nextRear);
   };
 
-  // Direct-to-S3 Presigned PUT uploader with sequential queue + retry
   const enqueuePresignedChunkUpload = (chunkBlob: Blob, partIndex: number, baseFileName: string): Promise<void> => {
     const runUpload = async () => {
       const contentType = chunkBlob.type || 'video/webm';
@@ -391,7 +390,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
       const recorder = new MediaRecorder(streamRef.current, {
         mimeType,
-        videoBitsPerSecond: 1800000, // ~1.8 Mbps cost-optimized bitrate
+        videoBitsPerSecond: 1800000,
       });
 
       mediaRecorderRef.current = recorder;

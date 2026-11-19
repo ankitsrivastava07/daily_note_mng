@@ -1,4 +1,4 @@
-package com.daily_notes.notes.config;
+package com.daily_note_dms.documents.config;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

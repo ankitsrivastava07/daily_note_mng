@@ -6,6 +6,7 @@ import com.daily_note_dms.documents.dto.VideoConfirmRequest;
 import com.daily_note_dms.documents.dto.VideoUploadRequest;
 import com.daily_note_dms.documents.video.dto.StatusUpdateRequest;
 import com.daily_note_dms.documents.video.entity.VideoRecording;
+import com.daily_note_dms.documents.video.service.VideoMergeService;
 import com.daily_note_dms.documents.video.service.VideoStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,17 +16,52 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/video")
 public class VideoController {
 
-    private final VideoStorageService videoStorageService;
     private final Logger logger = LoggerFactory.getLogger(VideoController.class);
+    private final VideoStorageService videoStorageService;
+    private final VideoMergeService videoMergeService;
 
-    public VideoController(VideoStorageService videoStorageService) {
+    public VideoController(VideoStorageService videoStorageService,
+                           VideoMergeService videoMergeService) {
         this.videoStorageService = videoStorageService;
+        this.videoMergeService = videoMergeService;
+    }
+
+    @GetMapping("/presign-chunk")
+    public ResponseEntity<?> presignChunk(
+            @RequestParam String userId,
+            @RequestParam String baseFileName,
+            @RequestParam(required = false, defaultValue = "note_123") String referenceId,
+            @RequestParam String fileName,
+            @RequestParam(required = false, defaultValue = "video/webm") String contentType) {
+
+        String uploadUrl = videoMergeService.generatePresignedPutUrl(
+                userId, baseFileName, referenceId, fileName, contentType
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "status", "OK",
+                "uploadUrl", uploadUrl
+        ));
+    }
+
+    @PostMapping("/merge-chunks")
+    public ResponseEntity<?> mergeChunks(
+            @RequestParam String baseFileName,
+            @RequestParam(required = false, defaultValue = "note_123") String referenceId,
+            @RequestParam String userId) {
+
+        String finalUrl = videoMergeService.streamLargeVideo(baseFileName, referenceId, userId);
+
+        return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "finalUrl", finalUrl
+        ));
     }
 
     @GetMapping("/presigned-url")
@@ -49,7 +85,6 @@ public class VideoController {
         return ResponseEntity.ok(List.of(response.uploadUrl()));
     }
 
-    // Upload complete hone ke baad status READY karne ke liye optional confirm API
     @PostMapping("/{videoId}/complete")
     public ResponseEntity<Void> confirmUpload(
             @PathVariable("videoId") String videoId,
@@ -61,13 +96,11 @@ public class VideoController {
         return ResponseEntity.ok().build();
     }
 
-    // User ki saari recorded videos ki list lane ke liye
     @GetMapping("/list/{userId}")
     public ResponseEntity<List<VideoRecording>> listUserVideos(@PathVariable("userId") String userId) {
         return ResponseEntity.ok(videoStorageService.findByUserId(userId));
     }
 
-    // Playback URL ke liye
     @GetMapping("/playback/{videoId}")
     public ResponseEntity<String> getPlaybackUrl(@PathVariable String videoId, @RequestParam String userId) {
         String url = videoStorageService.generatePlaybackUrl(videoId, userId);
@@ -76,7 +109,7 @@ public class VideoController {
 
     @PatchMapping("/status/{id}")
     public ResponseEntity<Void> updateVideoStatus(@PathVariable String id, @RequestBody StatusUpdateRequest request) {
-        VideoRecording record = videoStorageService.findById(id); // ya query/get item
+        VideoRecording record = videoStorageService.findById(id);
         if (record != null) {
             record.setStatus(request.getStatus());
             videoStorageService.save(record);
@@ -87,7 +120,6 @@ public class VideoController {
 
     @DeleteMapping("/{videoId}")
     public ResponseEntity<ApiResponse> deleteVideo(@PathVariable String videoId, @RequestParam String userId) {
-        // VideoRecording record = videoStorageService.findById(videoId, userId);
         videoStorageService.deleteVideoById(videoId, userId);
         ApiResponse apiResponse = new ApiResponse("Video deleted successfully",
                 true, new ArrayList<>(), new ArrayList<>());

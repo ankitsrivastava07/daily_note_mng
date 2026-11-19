@@ -20,6 +20,7 @@ import LiveStreamComponent from './Components/LiveStreamComponent';
 import ShortNoteView from './Components/ShortNoteView';
 import ShortNoteUpdate from './Components/ShortNoteUpdate';
 import { VideoListModal } from './Components/VideoListModal'; // Naya component jo abhi banaya tha
+import MountainVideoStudioUI from './Components/MountainVideoStudioUI';
 
 function App() {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
@@ -136,6 +137,7 @@ function App() {
                     <Link to="/video-recorder" style={tcsNavStyles.subLink} onClick={closeAll}>🎥 Mountain Video Recorder</Link>
                     <Link to="/video-library" style={tcsNavStyles.subLink} onClick={closeAll}>📂 Video Library & Playback</Link>
                     <Link to="/live-stream" style={tcsNavStyles.subLink} onClick={closeAll}>📡 Live Broadcaster Studio</Link>
+                    <Link to="/adventure-studio" style={tcsNavStyles.subLink} onClick={closeAll}>🏔️ Adventure Studio</Link>
                   </div>
                 </div>
               )}
@@ -165,6 +167,7 @@ function App() {
           <Route path="/video-recorder" element={<VideoRecorderComponent />} />
           <Route path="/video-library" element={<VideoListModal userId={userId} />} />
           <Route path="/live-stream" element={<LiveStreamComponent />} />
+          <Route path="/adventure-studio" element={<MountainVideoStudioUI />} />
           <Route path="*" element={<PageNotFound />} />
         </Routes>
       </main>
