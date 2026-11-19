@@ -356,7 +356,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       .catch((err) => {
         console.error(`[PresignedChunkError - Part ${partIndex}]:`, err);
         hasUploadErrorRef.current = true;
-        setErrorMsg(`Part ${partIndex} upload failed.`);
+        setErrorMsg(`Part ${partIndex} upload fail hua. Save block kiya gaya hai.`);
         throw err;
       });
 
@@ -376,9 +376,52 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     enqueuePresignedChunkUpload(chunkBlob, partIdx, baseFileNameRef.current);
   };
 
+  const handleFinishAndMerge = async () => {
+    if (hasUploadErrorRef.current) {
+      setErrorMsg('Pehle upload issue resolve karein, tab video save hogi.');
+      setStreamState('REVIEW');
+      return;
+    }
+
+    setStreamState('MERGING');
+    setErrorMsg(null);
+    setNotification({ message: 'Video save ho rahi hai, kripya ruken...', type: 'success' });
+
+    try {
+      const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
+      const userId = localStorage.getItem('userId') || DEFAULT_USER_ID;
+
+      const res = await fetch(
+        `${apiBaseUrl}/api/v1/video/merge-chunks?baseFileName=${encodeURIComponent(baseFileNameRef.current)}&referenceId=${encodeURIComponent(referenceId)}&userId=${encodeURIComponent(userId)}`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' } }
+      );
+
+      if (!res.ok) throw new Error('Failed to merge video chunks on server');
+
+      const data = await res.json();
+      const mergedUrl = data.finalUrl || data.data;
+      if (!mergedUrl) throw new Error('Missing merged video URL');
+
+      setFinalVideoUrl(mergedUrl);
+      setStreamState('REVIEW');
+      setNotification({ message: 'Video is ready !', type: 'success' });
+      setTimeout(() => setNotification(null), 4000);
+
+      if (onUploadSuccess) {
+        onUploadSuccess(baseFileNameRef.current);
+      }
+    } catch (err) {
+      console.error('[MergeError]:', err);
+      setErrorMsg('Video save karne mein error aaya. Retry Save dabayein.');
+      setStreamState('REVIEW');
+      setNotification({ message: 'Video save nahi ho paayi. Retry Save dabayein.', type: 'error' });
+    }
+  };
+
   const startRecording = () => {
     if (!streamRef.current) return;
     setErrorMsg(null);
+    setFinalVideoUrl(null);
     hasUploadErrorRef.current = false;
 
     try {
@@ -417,12 +460,10 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
         try {
           await uploadQueueRef.current;
-          setStreamState('REVIEW');
-          setNotification({ message: 'All 10MB chunks uploaded to S3! Ready to merge.', type: 'success' });
-          setTimeout(() => setNotification(null), 4000);
+          await handleFinishAndMerge();
         } catch {
           setStreamState('REVIEW');
-          setNotification({ message: 'Some chunks failed to upload.', type: 'error' });
+          setNotification({ message: 'Upload fail hua. Retry Save dabakar try karein.', type: 'error' });
         }
       };
 
@@ -455,45 +496,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     }
   };
 
-  const handleFinishAndMerge = async () => {
-    if (hasUploadErrorRef.current) {
-      setErrorMsg('Cannot merge: one or more chunks failed to upload.');
-      return;
-    }
-
-    setStreamState('MERGING');
-    setNotification({ message: 'Merging chunks on S3, please wait...', type: 'success' });
-
-    try {
-      const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
-      const userId = localStorage.getItem('userId') || DEFAULT_USER_ID;
-
-      const res = await fetch(
-        `${apiBaseUrl}/api/v1/video/merge-chunks?baseFileName=${encodeURIComponent(baseFileNameRef.current)}&referenceId=${encodeURIComponent(referenceId)}&userId=${encodeURIComponent(userId)}`,
-        { method: 'POST', headers: { 'Content-Type': 'application/json' } }
-      );
-
-      if (!res.ok) throw new Error('Failed to merge video chunks on server');
-
-      const data = await res.json();
-      const mergedUrl = data.finalUrl || data.data;
-
-      setFinalVideoUrl(mergedUrl);
-      setStreamState('REVIEW');
-      setNotification({ message: 'Recording merged and ready to play!', type: 'success' });
-
-      if (onUploadSuccess) {
-        onUploadSuccess(baseFileNameRef.current);
-      }
-    } catch (err) {
-      console.error('[MergeError]:', err);
-      setErrorMsg('Failed to merge video chunks.');
-      setStreamState('REVIEW');
-    }
-  };
-
   const handleDiscardAndRestart = () => {
     setFinalVideoUrl(null);
+    setErrorMsg(null);
     setElapsedSeconds(0);
     initializeMedia('CAMERA', useRearCamera);
   };
@@ -605,9 +610,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           <div className="vrc-placeholder">
             <div className="vrc-spinner" />
             <div className="vrc-placeholder__heading">
-              {streamState === 'UPLOADING' ? 'Uploading Remaining 10MB Chunks to S3...' : 'Merging Chunks on S3...'}
+              {streamState === 'UPLOADING' ? 'Saving your recording...' : 'Preparing your video...'}
             </div>
-            <div className="vrc-placeholder__sub">Please wait while your recording is being finalized.</div>
+            <div className="vrc-placeholder__sub">Please wait while your video is being processed.</div>
           </div>
         ) : streamState !== 'REVIEW' ? (
           <>
@@ -626,7 +631,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
                   <Icons.ScreenShare size={28} />
                 </div>
                 <div className="vrc-placeholder__heading">Screen Capture Active</div>
-                <div className="vrc-placeholder__sub">Direct-to-S3 10MB chunk upload active.</div>
+                <div className="vrc-placeholder__sub">Recording and auto-saving in progress.</div>
               </div>
             )}
 
@@ -639,14 +644,23 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
               </div>
             )}
           </>
-        ) : (
+        ) : finalVideoUrl ? (
           <video
-            src={finalVideoUrl || ''}
+            src={finalVideoUrl}
             controls
             autoPlay
             playsInline
             className="vrc-review-stream"
           />
+        ) : (
+          <div className="vrc-placeholder">
+            <div className="vrc-placeholder__heading">Recording Stopped</div>
+            <div className="vrc-placeholder__sub">
+              {errorMsg
+                ? 'Video save nahi ho paayi. Neeche "Retry Save" dabayein.'
+                : 'Aapki video process ho rahi hai...'}
+            </div>
+          </div>
         )}
 
         <div className="vrc-dock">
@@ -724,10 +738,10 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
                 <Icons.Retake />
                 <span>Record New</span>
               </button>
-              {!finalVideoUrl && (
+              {!finalVideoUrl && errorMsg && (
                 <button onClick={handleFinishAndMerge} className="vrc-btn vrc-btn--save">
                   <Icons.CloudUpload />
-                  <span>Finish & Merge Chunks</span>
+                  <span>Retry Save</span>
                 </button>
               )}
             </>
