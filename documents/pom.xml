@@ -77,21 +77,21 @@
              AWS Secrets Manager
              ===================================================== -->
 
-      <!--  <dependency>
-            <groupId>io.awspring.cloud</groupId>
-            <artifactId>spring-cloud-aws-starter-secrets-manager</artifactId>
-        </dependency>-->
-      <!--  <dependency>
-            <groupId>io.github.resilience4j</groupId>
-            <artifactId>resilience4j-spring-boot4</artifactId>
-            <version>2.4.0</version>
-        </dependency>
+        <!--  <dependency>
+              <groupId>io.awspring.cloud</groupId>
+              <artifactId>spring-cloud-aws-starter-secrets-manager</artifactId>
+          </dependency>-->
+        <!--  <dependency>
+              <groupId>io.github.resilience4j</groupId>
+              <artifactId>resilience4j-spring-boot4</artifactId>
+              <version>2.4.0</version>
+          </dependency>
 
-        <dependency>
-            <groupId>com.bucket4j</groupId>
-            <artifactId>bucket4j-core</artifactId>
-            <version>8.10.1</version>
-        </dependency>-->
+          <dependency>
+              <groupId>com.bucket4j</groupId>
+              <artifactId>bucket4j-core</artifactId>
+              <version>8.10.1</version>
+          </dependency>-->
 
         <!-- =====================================================
              Java Date/Time JSON Support
@@ -105,7 +105,12 @@
         </dependency>
         -->
 
-
+    <!--    &lt;!&ndash; AWS SDK v2 S3 Dependency &ndash;&gt;
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.20.26</version> &lt;!&ndash; Ya jo version tera baaki AWS SDK use kar raha hai &ndash;&gt;
+        </dependency>-->
         <!-- =====================================================
              Testing
              Currently disabled - preserved
