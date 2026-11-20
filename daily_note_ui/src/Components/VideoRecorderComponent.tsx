@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import './CSS/VideoRecorderComponent.css';
-
 interface VideoRecorderProps {
   referenceId?: string;
   onUploadSuccess?: (fileName: string) => void;
@@ -318,7 +317,13 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             `&fileName=${encodeURIComponent(partFileName)}` +
             `&contentType=${encodeURIComponent(contentType)}`;
 
-          const signRes = await fetch(presignUrl);
+          const signRes = await fetch(presignUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          });
+
           if (!signRes.ok) {
             throw new Error(`Presign failed (${signRes.status})`);
           }
