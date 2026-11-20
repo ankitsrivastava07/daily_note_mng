@@ -3,7 +3,8 @@ import './CSS/LiveStreamComponent.css';
 
 interface LiveStreamProps {
   streamId?: string;
-  onStreamStateChange?: (isLive: boolean) => void;
+  onStreamStateChange?: (isLive: boolean, streamId: string) => void;
+  onViewerCountChange?: (count: number) => void;
 }
 
 type StreamState = 'IDLE' | 'PREVIEW' | 'LIVE';
@@ -85,7 +86,9 @@ const Icons = {
 };
 
 export const LiveStreamComponent: React.FC<LiveStreamProps> = ({
+  streamId = 'studio-room-1',
   onStreamStateChange,
+  onViewerCountChange,
 }) => {
   const [streamState, setStreamState] = useState<StreamState>('IDLE');
   const [isFullView, setIsFullView] = useState<boolean>(false);
@@ -98,6 +101,20 @@ export const LiveStreamComponent: React.FC<LiveStreamProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const isMutedRef = useRef<boolean>(false);
+  const isCameraOffRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  useEffect(() => {
+    isCameraOffRef.current = isCameraOff;
+  }, [isCameraOff]);
+
+  useEffect(() => {
+    onViewerCountChange?.(viewerCount);
+  }, [viewerCount, onViewerCountChange]);
 
   const stopAllTracks = useCallback(() => {
     if (streamRef.current) {
@@ -110,28 +127,34 @@ export const LiveStreamComponent: React.FC<LiveStreamProps> = ({
     setErrorMsg(null);
     stopAllTracks();
     setIsCameraOff(false);
+    isCameraOffRef.current = false;
 
     try {
-      const constraints: MediaStreamConstraints = {
-        video: rearPreferred
-          ? { facingMode: { exact: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }
-          : { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-      };
+      const videoConstraint: MediaTrackConstraints = rearPreferred
+        ? { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+        : { facingMode: { ideal: 'user' }, width: { ideal: 1280 }, height: { ideal: 720 } };
 
       let stream: MediaStream;
       try {
-        stream = await navigator.mediaDevices.getUserMedia(constraints);
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: videoConstraint,
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        });
       } catch {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 1920 }, height: { ideal: 1080 } },
+          video: { width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: { echoCancellation: true, noiseSuppression: true },
         });
       }
+
+      // Preserve existing mute preference across camera switches
+      stream.getAudioTracks().forEach((t) => {
+        t.enabled = !isMutedRef.current;
+      });
 
       streamRef.current = stream;
       if (videoRef.current) {
@@ -141,7 +164,7 @@ export const LiveStreamComponent: React.FC<LiveStreamProps> = ({
       setStreamState('PREVIEW');
     } catch (err) {
       console.error('[StreamInitError]:', err);
-      setErrorMsg('Camera access denied or hardware unavailable.');
+      setErrorMsg('Camera or microphone permission denied / hardware unavailable.');
       setStreamState('IDLE');
     }
   }, [stopAllTracks]);
@@ -153,18 +176,22 @@ export const LiveStreamComponent: React.FC<LiveStreamProps> = ({
     };
   }, [initializePreview, stopAllTracks]);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullView(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
   const toggleFullscreen = async () => {
     try {
-      if (!isFullView) {
-        if (containerRef.current?.requestFullscreen) {
-          await containerRef.current.requestFullscreen();
-        }
-        setIsFullView(true);
+      if (!document.fullscreenElement && containerRef.current?.requestFullscreen) {
+        await containerRef.current.requestFullscreen();
+      } else if (document.fullscreenElement) {
+        await document.exitFullscreen();
       } else {
-        if (document.fullscreenElement) {
-          await document.exitFullscreen();
-        }
-        setIsFullView(false);
+        setIsFullView((prev) => !prev);
       }
     } catch {
       setIsFullView((prev) => !prev);
@@ -173,18 +200,22 @@ export const LiveStreamComponent: React.FC<LiveStreamProps> = ({
 
   const toggleMic = () => {
     if (!streamRef.current) return;
+    const nextMuted = !isMutedRef.current;
     streamRef.current.getAudioTracks().forEach((t) => {
-      t.enabled = isMuted;
+      t.enabled = !nextMuted;
     });
-    setIsMuted(!isMuted);
+    isMutedRef.current = nextMuted;
+    setIsMuted(nextMuted);
   };
 
   const toggleVideo = () => {
     if (!streamRef.current) return;
+    const nextCameraOff = !isCameraOffRef.current;
     streamRef.current.getVideoTracks().forEach((t) => {
-      t.enabled = isCameraOff;
+      t.enabled = !nextCameraOff;
     });
-    setIsCameraOff(!isCameraOff);
+    isCameraOffRef.current = nextCameraOff;
+    setIsCameraOff(nextCameraOff);
   };
 
   const flipCamera = () => {
@@ -194,15 +225,18 @@ export const LiveStreamComponent: React.FC<LiveStreamProps> = ({
   };
 
   const startLiveBroadcast = () => {
+    if (!streamRef.current) {
+      setErrorMsg('Initialize camera before going live.');
+      return;
+    }
     setStreamState('LIVE');
-    setViewerCount(1); // Simulated initial viewer
-    if (onStreamStateChange) onStreamStateChange(true);
+    onStreamStateChange?.(true, streamId);
   };
 
   const stopLiveBroadcast = () => {
     setStreamState('PREVIEW');
     setViewerCount(0);
-    if (onStreamStateChange) onStreamStateChange(false);
+    onStreamStateChange?.(false, streamId);
   };
 
   return (
@@ -215,7 +249,7 @@ export const LiveStreamComponent: React.FC<LiveStreamProps> = ({
         <div className="lsc-header__left">
           <span className={`lsc-status-dot ${streamState === 'LIVE' ? 'lsc-status-dot--live' : ''}`} />
           <span className="lsc-header__title">
-            {streamState === 'LIVE' ? '🔴 LIVE Broadcaster' : 'Live Stream Lobby'}
+            {streamState === 'LIVE' ? `LIVE Studio • ${streamId}` : `Broadcast Lobby • ${streamId}`}
           </span>
           {streamState === 'LIVE' && (
             <div className="lsc-viewer-badge">
@@ -300,6 +334,13 @@ export const LiveStreamComponent: React.FC<LiveStreamProps> = ({
                 className={`lsc-dock__icon-btn ${isMuted ? 'lsc-dock__icon-btn--danger' : ''}`}
               >
                 {isMuted ? <Icons.MicOff /> : <Icons.MicOn />}
+              </button>
+
+              <button
+                onClick={toggleVideo}
+                className={`lsc-dock__icon-btn ${isCameraOff ? 'lsc-dock__icon-btn--danger' : ''}`}
+              >
+                {isCameraOff ? <Icons.VideoOff /> : <Icons.VideoOn />}
               </button>
 
               <button onClick={stopLiveBroadcast} className="lsc-btn lsc-btn--end">
