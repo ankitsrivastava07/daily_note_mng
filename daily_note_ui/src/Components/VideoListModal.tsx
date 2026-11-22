@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 
 interface VideoItem {
   id: string;
-  referenceId: string;
   s3Key: string;
   status: string;
 }
@@ -109,7 +108,7 @@ export const VideoListModal: React.FC<{ userId: string }> = ({ userId }) => {
               🗑️
             </button>
 
-            <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '8px', paddingRight: '20px' }}>Ref: {vid.referenceId}</div>
+            <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '8px', paddingRight: '20px' }}>Ref: {vid.id}</div>
             <div style={{ fontSize: '12px', color: '#10B981' }}>Status: {vid.status}</div>
             <div style={{ marginTop: '10px', fontSize: '12px', color: '#3b82f6' }}>▶ Click to Watch</div>
           </div>

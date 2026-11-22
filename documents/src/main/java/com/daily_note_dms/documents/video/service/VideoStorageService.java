@@ -146,8 +146,7 @@ public class VideoStorageService {
     }
 
     public void deleteVideoById(String videoId, String userId) {
-
-        VideoRecording entity = findById(userId, videoId);
+        VideoRecording entity = findById(videoId, userId);
         if (entity == null) {
             throw new VideoNotFoundException("Video not found for id " + videoId);
         }
@@ -165,7 +164,7 @@ public class VideoStorageService {
             }
         }
 
-        videoRepository.deleteById(videoId, userId);
+        videoRepository.deleteById(userId, videoId);
         logger.info("Deleted DB record for videoId: {}", videoId);
     }
 }
