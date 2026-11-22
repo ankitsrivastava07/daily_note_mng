@@ -318,10 +318,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             `&contentType=${encodeURIComponent(contentType)}`;
 
           const signRes = await fetch(presignUrl, {
-            method: 'GET',
-            headers: {
-              'Content-Type': 'application/json'
-            }
+            method: 'GET'
           });
 
           if (!signRes.ok) {
@@ -409,7 +406,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
       setFinalVideoUrl(mergedUrl);
       setStreamState('REVIEW');
-      setNotification({ message: 'Video ready hai aur play ho rahi hai!', type: 'success' });
+      setNotification({ message: 'Video has been saved!', type: 'success' });
       setTimeout(() => setNotification(null), 4000);
 
       if (onUploadSuccess) {
@@ -417,9 +414,9 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       }
     } catch (err) {
       console.error('[MergeError]:', err);
-      setErrorMsg('Video save karne mein error aaya. Retry Save dabayein.');
+      setErrorMsg('Error has been occured please try again later.');
       setStreamState('REVIEW');
-      setNotification({ message: 'Video save nahi ho paayi. Retry Save dabayein.', type: 'error' });
+      setNotification({ message: 'Error has been occured please try again later.', type: 'error' });
     }
   };
 
