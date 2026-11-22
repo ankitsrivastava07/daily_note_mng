@@ -43,7 +43,7 @@ public class ShortNoteController {
         Map<String, AttributeValue> decodedKey = null;
         if (lastKey != null && !lastKey.isEmpty()) {
             try {
-                
+
                 Map<String, String> rawMap = new ObjectMapper().readValue(lastKey, new TypeReference<Map<String, String>>() {
                 });
                 decodedKey = new HashMap<>();

@@ -9,7 +9,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -28,13 +31,15 @@ public class VideoStorageService {
     private final S3Presigner s3Presigner;
     private final VideoRepository videoRepository;
     private final Logger logger = LoggerFactory.getLogger(VideoStorageService.class);
+    private final S3Client s3Client;
 
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
-    public VideoStorageService(S3Presigner s3Presigner, VideoRepository videoRepository) {
+    public VideoStorageService(S3Presigner s3Presigner, VideoRepository videoRepository, S3Client s3Client) {
         this.s3Presigner = s3Presigner;
         this.videoRepository = videoRepository;
+        this.s3Client = s3Client;
     }
 
     public PreSignedUrlResponse initiateVideoUpload(VideoUploadRequest req) {
@@ -136,6 +141,23 @@ public class VideoStorageService {
     }
 
     public void deleteVideoById(String videoId, String userId) {
+        VideoRecording entity = Optional.ofNullable(findById(videoId, userId))
+                .orElseThrow(() -> new VideoNotFoundException("Video not found"));
+
+        String s3Key = entity.getS3Key();
+        if (s3Key != null && !s3Key.isBlank()) {
+            try {
+                s3Client.deleteObject(DeleteObjectRequest.builder()
+                        .bucket(bucketName)
+                        .key(s3Key)
+                        .build());
+                logger.info("Deleted S3 object '{}' for videoId: {}", s3Key, videoId);
+            } catch (NoSuchKeyException ex) {
+                logger.warn("S3 object '{}' already missing for videoId: {}", s3Key, videoId);
+            }
+        }
+
         videoRepository.deleteById(videoId, userId);
+        logger.info("Deleted DB record for videoId: {}", videoId);
     }
 }
