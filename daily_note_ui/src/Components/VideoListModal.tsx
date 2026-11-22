@@ -79,7 +79,7 @@ export const VideoListModal: React.FC<{ userId: string }> = ({ userId }) => {
         setVideos(updatedList);
         clientVideoCache[userId] = updatedList;
       } else {
-        alert("Delete nahi ho paya, backend error.");
+        alert("Unable to delete video.");
       }
     } catch (err) {
       console.error("Failed to delete video", err);
