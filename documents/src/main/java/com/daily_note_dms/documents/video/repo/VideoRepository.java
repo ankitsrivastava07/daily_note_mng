@@ -9,8 +9,6 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -28,25 +26,25 @@ public class VideoRepository {
         videoTable.putItem(record);
     }
 
-    public VideoRecording findById(String id, String userId) {
-        Key key = Key.builder()
-                .partitionValue(userId) // 👈 Partition key pehle (user_id)
-                .sortValue(id)          // 👈 Sort key baad mein (id)
-                .build();
-
-        return videoTable.getItem(r -> r.key(key));
-    }
-
-    public VideoRecording findById(String id) {
-        Key key = Key.builder()
-                .partitionValue(id) // 👈 Partition key pehle (user_id)
-                .build();
-
-        return videoTable.getItem(r -> r.key(key));
-    }
-
     public void update(VideoRecording record) {
         videoTable.updateItem(record);
+    }
+
+    // Partition Key = userId (user_id), Sort Key = id
+    public Optional<VideoRecording> getItem(String userId, String id) {
+        if (userId == null || userId.isBlank() || id == null || id.isBlank()) {
+            return Optional.empty();
+        }
+        Key key = Key.builder()
+                .partitionValue(userId)
+                .sortValue(id)
+                .build();
+
+        return Optional.ofNullable(videoTable.getItem(r -> r.key(key)));
+    }
+
+    public VideoRecording findById(String userId, String id) {
+        return getItem(userId, id).orElse(null);
     }
 
     public List<VideoRecording> findByReferenceIdAndStatus(String referenceId, String status) {
@@ -65,26 +63,18 @@ public class VideoRepository {
     }
 
     public List<VideoRecording> findByUserId(String userId) {
-        // Query expression banayo jo userId (partition key) se match kare
         QueryConditional queryConditional = QueryConditional.keyEqualTo(k -> k.partitionValue(userId));
 
-        // query() method saari matching records ki list return karega
         return videoTable.query(r -> r.queryConditional(queryConditional))
                 .items()
                 .stream()
                 .collect(Collectors.toList());
     }
 
-    // 🔑 Correct Composite Key Lookup: Partition = userId, Sort = id
-    public Optional<VideoRecording> getItem(String id) {
-        Key key = Key.builder()
-                .partitionValue(id)
-                .build();
-
-        return Optional.ofNullable(videoTable.getItem(r -> r.key(key)));
-    }
-
-    public void deleteById(String videoId, String userId) {
+    public void deleteById(String userId, String videoId) {
+        if (userId == null || userId.isBlank() || videoId == null || videoId.isBlank()) {
+            return;
+        }
         Key key = Key.builder()
                 .partitionValue(userId)
                 .sortValue(videoId)

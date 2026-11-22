@@ -88,10 +88,10 @@ public class VideoController {
     @PostMapping("/{videoId}/complete")
     public ResponseEntity<Void> confirmUpload(
             @PathVariable("videoId") String videoId,
-            @RequestBody VideoConfirmRequest request) {
+            @RequestBody VideoConfirmRequest request, @RequestParam String userId) {
         logger.info("Confirming upload for videoId: {} with fileSizeBytes: {} and durationSeconds: {}",
                 videoId, request.fileSizeBytes(), request.durationSeconds());
-        videoStorageService.markUploadComplete(videoId, request.fileSizeBytes(), request.durationSeconds());
+        videoStorageService.markUploadComplete(videoId, request.fileSizeBytes(), request.durationSeconds(), userId);
         logger.info("Upload confirmed for videoId: {}", videoId);
         return ResponseEntity.ok().build();
     }
@@ -108,11 +108,14 @@ public class VideoController {
     }
 
     @PatchMapping("/status/{id}")
-    public ResponseEntity<Void> updateVideoStatus(@PathVariable String id, @RequestBody StatusUpdateRequest request) {
-        VideoRecording record = videoStorageService.findById(id);
+    public ResponseEntity<Void> updateVideoStatus(@PathVariable String id,
+                                                  @RequestBody StatusUpdateRequest request,
+                                                  @RequestParam String userId) {
+        VideoRecording record = videoStorageService.findById(id, userId);
         if (record != null) {
             record.setStatus(request.getStatus());
             videoStorageService.save(record);
+
             return ResponseEntity.ok().build();
         }
         return ResponseEntity.notFound().build();

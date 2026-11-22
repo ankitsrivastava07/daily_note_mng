@@ -93,9 +93,9 @@ public class VideoStorageService {
         return presignedRequest.url().toString();
     }
 
-    public void markUploadComplete(String videoId, Long fileSize, Integer duration) {
+    public void markUploadComplete(String videoId, Long fileSize, Integer duration, String userId) {
         logger.info("Marking Video Upload Complete: {}", videoId);
-        VideoRecording entity = Optional.ofNullable(videoRepository.findById(videoId))
+        VideoRecording entity = Optional.ofNullable(videoRepository.findById(userId, videoId))
                 .orElseThrow(() -> new VideoNotFoundException("Video record not found"));
         logger.info("Marking Video Upload Complete: {}", videoId);
         entity.setFileSizeBytes(fileSize);
@@ -106,7 +106,7 @@ public class VideoStorageService {
 
     public String generatePlaybackUrl(String videoId, String userId) {
         logger.info("Generating Playback Url for Video: {}", videoId);
-        VideoRecording entity = Optional.ofNullable(videoRepository.findById(videoId, userId))
+        VideoRecording entity = Optional.ofNullable(videoRepository.findById(userId, videoId))
                 .orElseThrow(() -> new VideoNotFoundException("Video not found"));
 
         logger.info("Generating presigned GET URL for videoId: {} with S3 key: {}", videoId, entity.getS3Key());
@@ -132,17 +132,25 @@ public class VideoStorageService {
         videoRepository.save(record);
     }
 
-    public VideoRecording findById(String id) {
-        return videoRepository.getItem(id).orElse(null);
-    }
-
     public VideoRecording findById(String id, String userId) {
-        return videoRepository.getItem(id).orElse(null);
+        VideoRecording entity = videoRepository.findById(userId, id);
+        if (entity == null) {
+            return null;
+        }
+        if (userId != null && !userId.isBlank()
+                && entity.getUserId() != null
+                && !userId.equals(entity.getUserId())) {
+            return null;
+        }
+        return entity;
     }
 
     public void deleteVideoById(String videoId, String userId) {
-        VideoRecording entity = Optional.ofNullable(findById(videoId, userId))
-                .orElseThrow(() -> new VideoNotFoundException("Video not found"));
+
+        VideoRecording entity = findById(userId, videoId);
+        if (entity == null) {
+            throw new VideoNotFoundException("Video not found for id " + videoId);
+        }
 
         String s3Key = entity.getS3Key();
         if (s3Key != null && !s3Key.isBlank()) {
