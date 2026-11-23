@@ -50,18 +50,53 @@ public class VideoController {
         ));
     }
 
+    // Merge commented out — chunks stay as parts in S3 without backend merging
+    /*
     @PostMapping("/merge-chunks")
     public ResponseEntity<?> mergeChunks(
             @RequestParam String baseFileName,
             @RequestParam(required = false, defaultValue = "note_123") String referenceId,
-            @RequestParam String userId) {
+            @RequestParam String userId,
+            @RequestParam(required = false) String videoId) {
 
-        String finalUrl = videoMergeService.streamLargeVideo(baseFileName, referenceId, userId);
+        String finalUrl = videoMergeService.streamLargeVideo(baseFileName, referenceId, userId, videoId);
 
         return ResponseEntity.ok(Map.of(
                 "status", "SUCCESS",
                 "finalUrl", finalUrl
         ));
+    }
+    */
+
+    @PostMapping("/register-chunks")
+    public ResponseEntity<?> registerChunks(
+            @RequestParam String userId,
+            @RequestParam String baseFileName,
+            @RequestParam(required = false, defaultValue = "note_123") String referenceId,
+            @RequestParam(required = false, defaultValue = "video/webm") String mimeType,
+            @RequestParam(required = false) Long fileSizeBytes,
+            @RequestParam(required = false) Integer durationSeconds) {
+
+        VideoRecording saved = videoStorageService.saveChunkedVideoRecord(
+                userId, baseFileName, referenceId, mimeType, fileSizeBytes, durationSeconds
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "videoId", saved.getId(),
+                "data", saved
+        ));
+    }
+
+    @GetMapping("/playback-parts")
+    public ResponseEntity<List<String>> getPlaybackParts(
+            @RequestParam String userId,
+            @RequestParam String baseFileName,
+            @RequestParam(required = false, defaultValue = "note_123") String referenceId) {
+
+        return ResponseEntity.ok(
+                videoStorageService.getPlaybackParts(userId, baseFileName, referenceId)
+        );
     }
 
     @GetMapping("/presigned-url")
