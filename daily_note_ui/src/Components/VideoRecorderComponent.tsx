@@ -12,11 +12,11 @@ type SourceMode = 'CAMERA' | 'SCREEN';
 type VideoResolution = '720P' | '1080P';
 
 const DEFAULT_USER_ID = 'ankit0397';
-const TARGET_CHUNK_SIZE = 10 * 1024 * 1024; // 10 MB OOM-safe chunk threshold
-const MAX_CONCURRENCY = 3; // Up to 3 parallel S3 chunk uploads
-const MAX_RETRIES = 2; // Cap retries to control wasted upload bandwidth
+const TARGET_CHUNK_SIZE = 10 * 1024 * 1024;
+const MAX_CONCURRENCY = 3;
+const MAX_RETRIES = 2;
 const TIMESLICE_MS = 2500;
-const VIDEO_BITRATE_BPS = 1100000; // ~1.1 Mbps cost-optimized bitrate
+const VIDEO_BITRATE_BPS = 1100000;
 
 const Icons = {
   MicOn: () => (
@@ -140,6 +140,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   const liveVideoRef = useRef<HTMLVideoElement | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const micStreamRef = useRef<MediaStream | null>(null);
 
   const currentBatchChunksRef = useRef<Blob[]>([]);
   const currentBatchSizeRef = useRef<number>(0);
@@ -156,10 +157,26 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   const isMountedRef = useRef<boolean>(true);
   const drainResolversRef = useRef<Array<{ resolve: () => void; reject: (err: unknown) => void }>>([]);
 
+  const getApiBaseUrl = () =>
+    (import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095').replace(/\/+$/, '');
+
   const stopAllTracks = useCallback(() => {
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current.getTracks().forEach((track) => {
+        track.enabled = false;
+        track.stop();
+      });
       streamRef.current = null;
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getTracks().forEach((track) => {
+        track.enabled = false;
+        track.stop();
+      });
+      micStreamRef.current = null;
+    }
+    if (liveVideoRef.current) {
+      liveVideoRef.current.srcObject = null;
     }
     if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
@@ -200,25 +217,31 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
         if (mode === 'SCREEN') {
           const displayOptions: DisplayMediaStreamOptions & { selfBrowserSurface?: string } = {
             video: { frameRate: { ideal: 24 } },
-            audio: {
-              echoCancellation: false,
-              noiseSuppression: false,
-              autoGainControl: false,
-            } as MediaTrackConstraints,
+            audio: true,
             selfBrowserSurface: 'exclude',
           };
 
           const displayStream = await navigator.mediaDevices.getDisplayMedia(displayOptions);
 
-          try {
-            const micStream = await navigator.mediaDevices.getUserMedia({
-              audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false },
-            });
-            stream = new MediaStream([
-              ...displayStream.getVideoTracks(),
-              ...micStream.getAudioTracks(),
-            ]);
-          } catch {
+          if (!isMuted) {
+            try {
+              const micStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                },
+              });
+              micStreamRef.current = micStream;
+              stream = new MediaStream([
+                ...displayStream.getVideoTracks(),
+                ...displayStream.getAudioTracks(),
+                ...micStream.getAudioTracks(),
+              ]);
+            } catch {
+              stream = displayStream;
+            }
+          } else {
             stream = displayStream;
           }
 
@@ -243,11 +266,13 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
             video: rearPreferred
               ? { facingMode: 'environment', ...videoConstraints }
               : { facingMode: 'user', ...videoConstraints },
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-            },
+            audio: isMuted
+              ? false
+              : {
+                  echoCancellation: true,
+                  noiseSuppression: true,
+                  autoGainControl: true,
+                },
           };
 
           try {
@@ -255,13 +280,17 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           } catch {
             stream = await navigator.mediaDevices.getUserMedia({
               video: videoConstraints,
-              audio: true,
+              audio: !isMuted,
             });
           }
         }
 
         if (!isMountedRef.current) {
           stream.getTracks().forEach((t) => t.stop());
+          if (micStreamRef.current) {
+            micStreamRef.current.getTracks().forEach((t) => t.stop());
+            micStreamRef.current = null;
+          }
           return;
         }
 
@@ -286,7 +315,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
         setStreamState('IDLE');
       }
     },
-    [selectedResolution, stopAllTracks, stopRecording, useRearCamera]
+    [isMuted, selectedResolution, stopAllTracks, stopRecording, useRearCamera]
   );
 
   useEffect(() => {
@@ -294,6 +323,15 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     initializeMedia('CAMERA', true);
     return () => {
       isMountedRef.current = false;
+      const recorder = mediaRecorderRef.current;
+      if (recorder && recorder.state !== 'inactive') {
+        try {
+          recorder.stop();
+        } catch {
+          // Ignore cleanup errors during unmount
+        }
+      }
+      mediaRecorderRef.current = null;
       stopAllTracks();
     };
   }, []);
@@ -311,7 +349,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
 
   const uploadSingleChunkWithRetry = async (task: PendingChunkTask): Promise<void> => {
     const contentType = task.chunkBlob.type || 'video/webm';
-    const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
+    const apiBaseUrl = getApiBaseUrl();
     const userId = localStorage.getItem('userId') || DEFAULT_USER_ID;
     const partFileName = `part_${String(task.partIndex).padStart(5, '0')}_${Date.now()}.webm`;
 
@@ -371,7 +409,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           console.error(`[PresignedChunkError - Part ${nextTask.partIndex}]:`, err);
           hasUploadErrorRef.current = true;
           if (isMountedRef.current) {
-            setErrorMsg(`Part ${nextTask.partIndex} upload fail hua. Save block kiya gaya hai.`);
+            setErrorMsg(`Part ${nextTask.partIndex} upload fail hua. Retry Save dabakar try karein.`);
           }
         })
         .finally(() => {
@@ -413,7 +451,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   };
 
   const loadPlaybackParts = async (baseFileName: string) => {
-    const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
+    const apiBaseUrl = getApiBaseUrl();
     const userId = localStorage.getItem('userId') || DEFAULT_USER_ID;
 
     const res = await fetch(
@@ -437,18 +475,13 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   const handleRegisterVideo = async () => {
     if (isSavingRef.current) return;
 
-    if (hasUploadErrorRef.current) {
-      setErrorMsg('Pehle upload issue resolve karein, tab video save hogi.');
-      setStreamState('REVIEW');
-      return;
-    }
-
     isSavingRef.current = true;
     setStreamState('SAVING');
     setErrorMsg(null);
+    hasUploadErrorRef.current = false;
 
     try {
-      const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
+      const apiBaseUrl = getApiBaseUrl();
       const userId = localStorage.getItem('userId') || DEFAULT_USER_ID;
 
       const res = await fetch(
@@ -605,11 +638,18 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   };
 
   const toggleMic = () => {
-    if (!streamRef.current) return;
-    streamRef.current.getAudioTracks().forEach((track) => {
-      track.enabled = isMuted;
-    });
-    setIsMuted(!isMuted);
+    const nextMuted = !isMuted;
+    if (streamRef.current) {
+      streamRef.current.getAudioTracks().forEach((track) => {
+        track.enabled = !nextMuted;
+      });
+    }
+    if (micStreamRef.current) {
+      micStreamRef.current.getAudioTracks().forEach((track) => {
+        track.enabled = !nextMuted;
+      });
+    }
+    setIsMuted(nextMuted);
   };
 
   const toggleVideoFeed = () => {
