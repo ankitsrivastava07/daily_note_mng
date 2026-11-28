@@ -8,14 +8,28 @@ interface VideoRecorderProps {
 }
 
 type StreamState = 'IDLE' | 'PREVIEW_LIVE' | 'RECORDING' | 'REVIEW' | 'UPLOADING' | 'SAVING';
-type VideoResolution = '720P' | '1080P';
+type VideoResolution = '480P' | '720P' | '1080P' | '1440P' | '4K';
 
 const DEFAULT_USER_ID = 'ankit0397';
 const TARGET_CHUNK_SIZE = 10 * 1024 * 1024;
-const MAX_CONCURRENCY = 3;
+const MAX_CONCURRENCY = 1;
 const MAX_RETRIES = 2;
 const TIMESLICE_MS = 2500;
-const VIDEO_BITRATE_BPS = 1100000;
+const VIDEO_BITRATE_BY_RESOLUTION: Record<VideoResolution, number> = {
+  '480P': 1500000,
+  '720P': 3000000,
+  '1080P': 6000000,
+  '1440P': 10000000,
+  '4K': 18000000,
+};
+
+const RESOLUTION_CONSTRAINTS: Record<VideoResolution, { width: number; height: number }> = {
+  '480P': { width: 854, height: 480 },
+  '720P': { width: 1280, height: 720 },
+  '1080P': { width: 1920, height: 1080 },
+  '1440P': { width: 2560, height: 1440 },
+  '4K': { width: 3840, height: 2160 },
+};
 
 interface PendingChunkTask {
   chunkBlob: Blob;
@@ -38,8 +52,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   const [isCameraOff, setIsCameraOff] = useState<boolean>(false);
   const [useRearCamera, setUseRearCamera] = useState<boolean>(true);
 
-  const [partUrls, setPartUrls] = useState<string[]>([]);
-  const [activePartIdx, setActivePartIdx] = useState<number>(0);
+  const [playbackUrl, setPlaybackUrl] = useState<string | null>(null);
   const [isRegistered, setIsRegistered] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -54,7 +67,13 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   const totalUploadedBytesRef = useRef<number>(0);
   const partCounterRef = useRef<number>(1);
   const baseFileNameRef = useRef<string>('');
+  const videoIdRef = useRef<string>('');
+  const uploadIdRef = useRef<string>('');
+  const completedPartsRef = useRef<Map<number, string>>(new Map());
+  const failedTasksRef = useRef<PendingChunkTask[]>([]);
+  const recordingMimeTypeRef = useRef<string>('video/webm');
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedSecondsRef = useRef<number>(0);
 
   const taskQueueRef = useRef<PendingChunkTask[]>([]);
   const activeWorkersRef = useRef<number>(0);
@@ -112,10 +131,13 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
       const targetRes = resOverride || selectedResolution;
 
       try {
-        const videoConstraints: MediaTrackConstraints =
-          targetRes === '1080P'
-            ? { width: { ideal: 1920 }, height: { ideal: 1080 } }
-            : { width: { ideal: 1280 }, height: { ideal: 720 } };
+        const requestedSize = RESOLUTION_CONSTRAINTS[targetRes];
+        // "ideal" asks the camera for this resolution without failing when
+        // the device/browser cannot provide it.
+        const videoConstraints: MediaTrackConstraints = {
+          width: { ideal: requestedSize.width },
+          height: { ideal: requestedSize.height },
+        };
 
         const audioConstraints: MediaTrackConstraints | boolean = isMuted
           ? false
@@ -142,8 +164,10 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           });
         }
 
-        if (!isMountedRef.current) {
-          stream.getTracks().forEach((t) => t.stop());
+        // If the user switched tabs while the permission dialog was open,
+        // do not leave the camera running in the background.
+        if (!isMountedRef.current || document.visibilityState === 'hidden') {
+          stream.getTracks().forEach((track) => track.stop());
           return;
         }
 
@@ -166,7 +190,38 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   useEffect(() => {
     isMountedRef.current = true;
     initializeMedia(true);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'hidden') return;
+
+      // A tab switch ends an active recording cleanly; onstop flushes the
+      // final chunk and the existing multipart upload flow continues.
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        setIsCameraOff(true);
+        // Stop MediaRecorder first so its final dataavailable event is queued,
+        // then release the camera/microphone hardware immediately.
+        stopRecording();
+        stopAllTracks();
+        return;
+      }
+
+      // Preview-only camera: release hardware immediately. It will NOT
+      // automatically restart when the user returns to this tab.
+      if (streamRef.current) {
+        stopAllTracks();
+        setIsCameraOff(true);
+        setStreamState((current) =>
+          current === 'UPLOADING' || current === 'SAVING' || current === 'REVIEW'
+            ? current
+            : 'IDLE'
+        );
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       isMountedRef.current = false;
       const recorder = mediaRecorderRef.current;
       if (recorder && recorder.state !== 'inactive') {
@@ -193,54 +248,65 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   };
 
   const uploadSingleChunkWithRetry = async (task: PendingChunkTask): Promise<void> => {
-    const contentType = task.chunkBlob.type || 'video/webm';
+    const contentType = task.chunkBlob.type || recordingMimeTypeRef.current || 'video/webm';
     const apiBaseUrl = getApiBaseUrl();
     const userId = localStorage.getItem('userId') || DEFAULT_USER_ID;
-    const partFileName = `part_${String(task.partIndex).padStart(5, '0')}_${Date.now()}.webm`;
+
+    if (!videoIdRef.current || !uploadIdRef.current) {
+      throw new Error('Multipart upload session missing. Please restart recording.');
+    }
 
     let lastErr: unknown;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const presignUrl =
-          `${apiBaseUrl}/api/v1/video/presign-chunk` +
+        const partUrl =
+          `${apiBaseUrl}/api/v1/video/multipart/part-url` +
           `?userId=${encodeURIComponent(userId)}` +
-          `&baseFileName=${encodeURIComponent(task.baseFileName)}` +
-          `&referenceId=${encodeURIComponent(referenceId)}` +
-          `&fileName=${encodeURIComponent(partFileName)}` +
-          `&contentType=${encodeURIComponent(contentType)}`;
+          `&videoId=${encodeURIComponent(videoIdRef.current)}` +
+          `&partNumber=${encodeURIComponent(String(task.partIndex))}`;
 
-        const signRes = await fetch(presignUrl, { method: 'GET' });
+        const signRes = await fetch(partUrl, { method: 'GET' });
         if (!signRes.ok) {
-          throw new Error(`Presign failed (${signRes.status})`);
+          throw new Error(`Part URL request failed (${signRes.status})`);
         }
 
-        const signData = await signRes.json();
-        const uploadUrl: string | undefined = signData.uploadUrl || signData.data;
-        if (!uploadUrl) {
-          throw new Error('Missing uploadUrl in presign response');
+        const signData: { uploadUrl?: string } = await signRes.json();
+        if (!signData.uploadUrl) {
+          throw new Error('Missing uploadUrl in multipart part-url response');
         }
 
-        const putRes = await fetch(uploadUrl, {
+        const putRes = await fetch(signData.uploadUrl, {
           method: 'PUT',
           headers: { 'Content-Type': contentType },
           body: task.chunkBlob,
         });
 
         if (!putRes.ok) {
-          throw new Error(`Direct S3 PUT failed (${putRes.status})`);
+          throw new Error(`S3 multipart PUT failed (${putRes.status})`);
         }
 
+        const eTag = putRes.headers.get('ETag');
+        if (!eTag) {
+          throw new Error(
+            'S3 ETag browser ko nahi mila. Bucket CORS mein ExposeHeaders: ["ETag"] add karo.'
+          );
+        }
+
+        // Map prevents duplicate entries if the same part is retried.
+        completedPartsRef.current.set(task.partIndex, eTag);
         totalUploadedBytesRef.current += task.chunkBlob.size;
         return;
       } catch (err) {
         lastErr = err;
         if (attempt < MAX_RETRIES) {
-          await new Promise((r) => setTimeout(r, 500 * attempt));
+          await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
         }
       }
     }
 
-    throw lastErr instanceof Error ? lastErr : new Error(`Part ${task.partIndex} upload failed`);
+    throw lastErr instanceof Error
+      ? lastErr
+      : new Error(`Multipart part ${task.partIndex} upload failed`);
   };
 
   const pumpUploadQueue = () => {
@@ -253,6 +319,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
         .catch((err) => {
           console.error(`[PresignedChunkError - Part ${nextTask.partIndex}]:`, err);
           hasUploadErrorRef.current = true;
+          failedTasksRef.current.push(nextTask);
           if (isMountedRef.current) {
             setErrorMsg(`Part ${nextTask.partIndex} upload fail hua. Retry Save dabakar try karein.`);
           }
@@ -295,25 +362,33 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     enqueuePresignedChunkUpload(chunkBlob, partIdx, baseFileNameRef.current);
   };
 
-  const loadPlaybackParts = async (baseFileName: string) => {
+  const loadSinglePlaybackUrl = async () => {
     const apiBaseUrl = getApiBaseUrl();
     const userId = localStorage.getItem('userId') || DEFAULT_USER_ID;
 
     const res = await fetch(
-      `${apiBaseUrl}/api/v1/video/playback-parts` +
-      `?userId=${encodeURIComponent(userId)}` +
-      `&baseFileName=${encodeURIComponent(baseFileName)}` +
-      `&referenceId=${encodeURIComponent(referenceId)}`
+      `${apiBaseUrl}/api/v1/video/playback/${encodeURIComponent(videoIdRef.current)}` +
+      `?userId=${encodeURIComponent(userId)}`
     );
 
     if (!res.ok) {
-      throw new Error(`Playback parts failed (${res.status})`);
+      throw new Error(`Playback URL request failed (${res.status})`);
     }
 
-    const urls: string[] = await res.json();
+    const responseText = await res.text();
+    let url = responseText;
+    try {
+      url = JSON.parse(responseText);
+    } catch {
+      // Spring ResponseEntity<String> may return a plain URL.
+    }
+
+    if (typeof url !== 'string' || !url.startsWith('http')) {
+      throw new Error('Invalid playback URL returned by backend');
+    }
+
     if (isMountedRef.current) {
-      setPartUrls(urls);
-      setActivePartIdx(0);
+      setPlaybackUrl(url);
     }
   };
 
@@ -323,35 +398,55 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     isSavingRef.current = true;
     setStreamState('SAVING');
     setErrorMsg(null);
-    hasUploadErrorRef.current = false;
 
     try {
+      // Requeue only tasks that failed; successful parts keep their ETags.
+      if (failedTasksRef.current.length > 0) {
+        const retryTasks = failedTasksRef.current.splice(0);
+        hasUploadErrorRef.current = false;
+        retryTasks.forEach((task) => taskQueueRef.current.push(task));
+        pumpUploadQueue();
+      }
+
+      await waitForAllUploads();
+
+      const parts = Array.from(completedPartsRef.current.entries())
+        .sort(([partA], [partB]) => partA - partB)
+        .map(([partNumber, eTag]) => ({ partNumber, eTag }));
+
+      if (parts.length === 0) {
+        throw new Error('No uploaded video parts found');
+      }
+
       const apiBaseUrl = getApiBaseUrl();
       const userId = localStorage.getItem('userId') || DEFAULT_USER_ID;
 
-      const res = await fetch(
-        `${apiBaseUrl}/api/v1/video/register-chunks` +
+      const completeRes = await fetch(
+        `${apiBaseUrl}/api/v1/video/multipart/complete` +
         `?userId=${encodeURIComponent(userId)}` +
-        `&baseFileName=${encodeURIComponent(baseFileNameRef.current)}` +
-        `&referenceId=${encodeURIComponent(referenceId)}` +
-        `&mimeType=${encodeURIComponent('video/webm')}` +
-        `&fileSizeBytes=${encodeURIComponent(String(totalUploadedBytesRef.current))}` +
-        `&durationSeconds=${encodeURIComponent(String(elapsedSeconds))}`,
-        { method: 'POST' }
+        `&videoId=${encodeURIComponent(videoIdRef.current)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            parts,
+            fileSizeBytes: totalUploadedBytesRef.current,
+            durationSeconds: elapsedSecondsRef.current,
+          }),
+        }
       );
 
-      if (!res.ok) {
-        throw new Error(`Register chunks failed (${res.status})`);
+      if (!completeRes.ok) {
+        const errorText = await completeRes.text().catch(() => '');
+        throw new Error(`Multipart complete failed (${completeRes.status}): ${errorText}`);
       }
 
-      await loadPlaybackParts(baseFileNameRef.current).catch((playErr) => {
-        console.warn('[PlaybackPartsWarn]:', playErr);
-      });
+      await loadSinglePlaybackUrl();
 
       if (!isMountedRef.current) return;
       setIsRegistered(true);
       setStreamState('REVIEW');
-      setNotification({ message: 'Video chunks saved & registered!', type: 'success' });
+      setNotification({ message: 'Single video successfully saved!', type: 'success' });
       setTimeout(() => {
         if (isMountedRef.current) setNotification(null);
       }, 4000);
@@ -360,10 +455,14 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
         onUploadSuccess(baseFileNameRef.current);
       }
     } catch (err) {
-      console.error('[RegisterChunksError]:', err);
+      console.error('[MultipartVideoSaveError]:', err);
       if (!isMountedRef.current) return;
       setIsRegistered(false);
-      setErrorMsg('Video register nahi ho paayi. "Retry Save" dabayein.');
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : 'Video save nahi ho paayi. Retry Save dabayein.'
+      );
       setStreamState('REVIEW');
       setNotification({ message: 'Save failed. Please retry.', type: 'error' });
     } finally {
@@ -371,42 +470,74 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
     }
   };
 
-  const startRecording = () => {
+  const startRecording = async () => {
     if (!streamRef.current) return;
+
     setErrorMsg(null);
-    setPartUrls([]);
-    setActivePartIdx(0);
+    setPlaybackUrl(null);
     setIsRegistered(false);
     totalUploadedBytesRef.current = 0;
+    completedPartsRef.current.clear();
+    failedTasksRef.current = [];
     hasUploadErrorRef.current = false;
     isStoppingRef.current = false;
     isSavingRef.current = false;
     taskQueueRef.current = [];
     drainResolversRef.current = [];
+    partCounterRef.current = 1;
+    videoIdRef.current = '';
+    uploadIdRef.current = '';
 
     try {
+      // Keep the stored S3 object extension and MIME type consistent.
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
         ? 'video/webm;codecs=vp9,opus'
         : MediaRecorder.isTypeSupported('video/webm')
           ? 'video/webm'
-          : 'video/mp4';
+          : '';
+
+      if (!mimeType) {
+        throw new Error('This browser does not support WebM recording.');
+      }
+
+      recordingMimeTypeRef.current = mimeType;
+      baseFileNameRef.current = `video_capture_${Date.now()}`;
+
+      const apiBaseUrl = getApiBaseUrl();
+      const userId = localStorage.getItem('userId') || DEFAULT_USER_ID;
+      const initiateUrl =
+        `${apiBaseUrl}/api/v1/video/multipart/initiate` +
+        `?userId=${encodeURIComponent(userId)}` +
+        `&baseFileName=${encodeURIComponent(baseFileNameRef.current)}` +
+        `&referenceId=${encodeURIComponent(referenceId)}` +
+        `&mimeType=${encodeURIComponent(mimeType)}`;
+
+      const initiateRes = await fetch(initiateUrl, { method: 'POST' });
+      if (!initiateRes.ok) {
+        throw new Error(`Multipart initiate failed (${initiateRes.status})`);
+      }
+
+      const initiateData: { videoId?: string; uploadId?: string } = await initiateRes.json();
+      if (!initiateData.videoId || !initiateData.uploadId) {
+        throw new Error('Multipart initiate response must contain videoId and uploadId');
+      }
+
+      videoIdRef.current = initiateData.videoId;
+      uploadIdRef.current = initiateData.uploadId;
 
       const recorder = new MediaRecorder(streamRef.current, {
         mimeType,
-        videoBitsPerSecond: VIDEO_BITRATE_BPS,
+        videoBitsPerSecond: VIDEO_BITRATE_BY_RESOLUTION[selectedResolution],
       });
 
       mediaRecorderRef.current = recorder;
       currentBatchChunksRef.current = [];
       currentBatchSizeRef.current = 0;
-      partCounterRef.current = 1;
 
-      baseFileNameRef.current = `video_capture_${Date.now()}`;
-
-      recorder.ondataavailable = (e: BlobEvent) => {
-        if (e.data && e.data.size > 0) {
-          currentBatchChunksRef.current.push(e.data);
-          currentBatchSizeRef.current += e.data.size;
+      recorder.ondataavailable = (event: BlobEvent) => {
+        if (event.data && event.data.size > 0) {
+          currentBatchChunksRef.current.push(event.data);
+          currentBatchSizeRef.current += event.data.size;
           flushBuffer(false, mimeType);
         }
       };
@@ -420,38 +551,44 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
         if (!isMountedRef.current) return;
         setStreamState('UPLOADING');
 
+        // Allow the last queued part to finish before CompleteMultipartUpload.
         try {
           await waitForAllUploads();
           await handleRegisterVideo();
-        } catch {
+        } catch (err) {
           if (!isMountedRef.current) return;
           setStreamState('REVIEW');
+          setErrorMsg(
+            err instanceof Error ? err.message : 'Part upload failed. Retry Save dabayein.'
+          );
           setNotification({ message: 'Upload fail hua. Retry Save dabakar try karein.', type: 'error' });
         }
       };
 
       recorder.start(TIMESLICE_MS);
+      elapsedSecondsRef.current = 0;
       setElapsedSeconds(0);
       setStreamState('RECORDING');
 
       timerIntervalRef.current = setInterval(() => {
-        setElapsedSeconds((prev) => {
-          if (prev + 1 >= maxDurationSeconds) {
+        setElapsedSeconds((previous) => {
+          const next = previous + 1;
+          elapsedSecondsRef.current = next;
+          if (next >= maxDurationSeconds) {
             stopRecording();
-            return prev + 1;
           }
-          return prev + 1;
+          return next;
         });
       }, 1000);
     } catch (err) {
       console.error('[MediaRecorderError]:', err);
-      setErrorMsg('Unable to start recording.');
+      setErrorMsg(err instanceof Error ? err.message : 'Unable to start recording.');
+      setStreamState('PREVIEW_LIVE');
     }
   };
 
   const handleDiscardAndRestart = () => {
-    setPartUrls([]);
-    setActivePartIdx(0);
+    setPlaybackUrl(null);
     setIsRegistered(false);
     setErrorMsg(null);
     setElapsedSeconds(0);
@@ -492,11 +629,27 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
   };
 
   const toggleVideoFeed = () => {
-    if (!streamRef.current) return;
-    streamRef.current.getVideoTracks().forEach((track) => {
-      track.enabled = isCameraOff;
-    });
-    setIsCameraOff(!isCameraOff);
+    // Camera is currently off: explicitly request a fresh stream.
+    if (isCameraOff) {
+      initializeMedia(useRearCamera);
+      return;
+    }
+
+    // Turning the camera off must release the hardware, not merely set
+    // track.enabled=false (that keeps the camera device active).
+    setIsCameraOff(true);
+
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
+      // Stopping the video track ends this recording session; onstop flushes
+      // the final chunk and the existing multipart upload flow saves it.
+      stopRecording();
+      stopAllTracks();
+      return;
+    }
+
+    stopAllTracks();
+    setStreamState('IDLE');
   };
 
   const handleFlipCamera = () => {
@@ -571,8 +724,11 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
                 disabled={streamState === 'RECORDING'}
                 className="vrc-resolution-select"
               >
+                <option value="480P">480p SD</option>
                 <option value="720P">720p HD</option>
-                <option value="1080P">1080p FHD</option>
+                <option value="1080P">1080p Full HD</option>
+                <option value="1440P">1440p QHD</option>
+                <option value="4K">4K UHD</option>
               </select>
 
               <div className="vrc-zoom-group">
@@ -608,7 +764,7 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
           <div className="vrc-placeholder">
             <div className="vrc-spinner" />
             <div className="vrc-placeholder__heading">
-              {streamState === 'UPLOADING' ? 'Uploading chunks to S3...' : 'Registering video record...'}
+              {streamState === 'UPLOADING' ? 'Uploading video parts to S3...' : 'Completing video upload...'}
             </div>
             <div className="vrc-placeholder__sub">Please wait while your recording is being saved.</div>
           </div>
@@ -629,30 +785,24 @@ export const VideoRecorderComponent: React.FC<VideoRecorderProps> = ({
               </div>
             )}
           </>
-        ) : partUrls.length > 0 ? (
+        ) : playbackUrl ? (
           <video
-            key={partUrls[activePartIdx]}
-            src={partUrls[activePartIdx]}
+            key={playbackUrl}
+            src={playbackUrl}
             controls
-            autoPlay={activePartIdx > 0}
             playsInline
             preload="metadata"
             className="vrc-review-stream"
-            onEnded={() => {
-              if (activePartIdx + 1 < partUrls.length) {
-                setActivePartIdx((prev) => prev + 1);
-              }
-            }}
           />
         ) : (
           <div className="vrc-placeholder">
             <div className="vrc-placeholder__heading">
-              {isRegistered ? 'Recording Saved (Parts in S3)' : 'Recording Stopped'}
+              {isRegistered ? 'Recording Saved' : 'Recording Stopped'}
             </div>
             <div className="vrc-placeholder__sub">
               {errorMsg
                 ? 'Video save nahi ho paayi. Neeche "Retry Save" dabayein.'
-                : 'Chunks S3 mein upload ho chuke hain.'}
+                : 'Video parts upload hone ke baad final video complete hogi.'}
             </div>
           </div>
         )}

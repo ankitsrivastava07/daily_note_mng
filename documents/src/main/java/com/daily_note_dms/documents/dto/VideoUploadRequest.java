@@ -3,6 +3,16 @@ package com.daily_note_dms.documents.dto;
 public class VideoUploadRequest {
     private String referenceId;
 
+    public String getVideoId() {
+        return videoId;
+    }
+
+    public void setVideoId(String videoId) {
+        this.videoId = videoId;
+    }
+
+    private String videoId;
+
     public String getMimeType() {
         return mimeType;
     }

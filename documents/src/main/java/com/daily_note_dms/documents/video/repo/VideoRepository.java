@@ -9,6 +9,8 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
+import java.time.Instant;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -23,10 +25,19 @@ public class VideoRepository {
     }
 
     public void save(VideoRecording record) {
+        Instant now = Instant.now();
+        // Created only once
+        if (record.getCreatedAt() == null) {
+            record.setCreatedAt(now.toString());
+        }
+
+        // Updated on every save
+        // record.setUpdatedAt(now.toString());
         videoTable.putItem(record);
     }
 
     public void update(VideoRecording record) {
+        record.setUpdatedAt(Instant.now().toString());
         videoTable.updateItem(record);
     }
 
@@ -63,11 +74,17 @@ public class VideoRepository {
     }
 
     public List<VideoRecording> findByUserId(String userId) {
-        QueryConditional queryConditional = QueryConditional.keyEqualTo(k -> k.partitionValue(userId));
+        QueryConditional queryConditional = QueryConditional.keyEqualTo(k ->
+                k.partitionValue(userId));
 
-        return videoTable.query(r -> r.queryConditional(queryConditional))
+        return videoTable
+                .query(r ->
+                        r.queryConditional(queryConditional))
                 .items()
                 .stream()
+                .sorted(Comparator.comparing(VideoRecording::getCreatedAt,
+                        Comparator
+                                .nullsLast(Comparator.reverseOrder())).reversed())
                 .collect(Collectors.toList());
     }
 

@@ -10,13 +10,19 @@ import com.daily_note_dms.documents.video.service.VideoMergeService;
 import com.daily_note_dms.documents.video.service.VideoStorageService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
+import software.amazon.awssdk.services.s3.model.CompletedPart;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/video")
@@ -99,25 +105,71 @@ public class VideoController {
         );
     }
 
-    @GetMapping("/presigned-url")
-    public ResponseEntity<List<String>> getPresignedUrl(
+    @GetMapping(
+            value = "/playback/stream",
+            produces = "video/webm"
+    )
+    public ResponseEntity<StreamingResponseBody> streamVideo(
+            @RequestParam String userId,
+            @RequestParam String baseFileName,
+            @RequestParam(required = false, defaultValue = "note_123")
+            String referenceId) {
+
+        logger.info(
+                "Video streaming requested for userId: {}, baseFileName: {}",
+                userId,
+                baseFileName
+        );
+
+        StreamingResponseBody stream = outputStream -> {
+            try {
+                videoStorageService.streamChunkedVideo(
+                        userId,
+                        baseFileName,
+                        referenceId,
+                        outputStream
+                );
+            } catch (IOException ex) {
+                logger.error("Video streaming failed", ex);
+                throw ex;
+            }
+        };
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("video/webm"))
+                .header(
+                        HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"recording.webm\""
+                )
+                .body(stream);
+    }
+
+    @GetMapping("/presign-url")
+    public ResponseEntity<PreSignedUrlResponse> getPresignedUrl(
             @RequestParam("referenceId") String referenceId,
             @RequestParam("fileName") String fileName,
             @RequestParam("userId") String userId,
-            @RequestParam("mimeType") String mimeType) {
+            @RequestParam("mimeType") String mimeType,
+            @RequestParam(required = false) String videoId) {
 
-        logger.info("Request received for presigned URL with referenceId: {} and userId: {}", referenceId, userId);
-
+        logger.info(
+                "Presigned URL request received. userId: {}, referenceId: {}, videoId: {}, fileName: {}",
+                userId, referenceId, videoId, fileName
+        );
         VideoUploadRequest request = new VideoUploadRequest();
         request.setUserId(userId);
         request.setReferenceId(referenceId);
         request.setFileName(fileName);
         request.setMimeType(mimeType);
+        request.setVideoId(videoId);
 
         PreSignedUrlResponse response = videoStorageService.initiateVideoUpload(request);
 
-        logger.info("Generated PUT presigned URL for videoId: {}", response.videoId());
-        return ResponseEntity.ok(List.of(response.uploadUrl()));
+        logger.info(
+                "Presigned PUT URL generated successfully for videoId: {}",
+                response.videoId()
+        );
+        return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
     @PostMapping("/{videoId}/complete")
@@ -131,8 +183,9 @@ public class VideoController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/list/{userId}")
-    public ResponseEntity<List<VideoRecording>> listUserVideos(@PathVariable("userId") String userId) {
+    @GetMapping("/reference/{referenceId}/user/{userId}")
+    public ResponseEntity<List<VideoRecording>> listUserVideos(@PathVariable String referenceId,
+                                                               @PathVariable String userId) {
         return ResponseEntity.ok(videoStorageService.findByUserId(userId));
     }
 
@@ -162,5 +215,82 @@ public class VideoController {
         ApiResponse apiResponse = new ApiResponse("Video deleted successfully",
                 true, new ArrayList<>(), new ArrayList<>());
         return new ResponseEntity<>(apiResponse, HttpStatus.OK);
+    }
+
+    // 1. Initiate S3 Multipart Upload
+    @PostMapping("/multipart/initiate")
+    public ResponseEntity<Map<String, String>> initiateMultipartUpload(
+            @RequestParam String userId,
+            @RequestParam String baseFileName,
+            @RequestParam(required = false, defaultValue = "note_123") String referenceId,
+            @RequestParam(required = false, defaultValue = "video/webm") String mimeType) {
+
+        Map<String, String> response =
+                videoStorageService.initiateMultipartUpload(
+                        userId, baseFileName, referenceId, mimeType
+                );
+
+        return ResponseEntity.ok(response);
+    }
+
+
+    // 2. Generate Presigned URL for each S3 Part
+    @GetMapping("/multipart/part-url")
+    public ResponseEntity<Map<String, String>> generateMultipartPartUrl(
+            @RequestParam String userId,
+            @RequestParam String videoId,
+            @RequestParam int partNumber) {
+
+        String uploadUrl = videoStorageService.generatePartUploadUrl(
+                userId, videoId, partNumber
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "uploadUrl", uploadUrl,
+                "partNumber", String.valueOf(partNumber)
+        ));
+    }
+
+    // 3. Complete S3 Multipart Upload
+    @PostMapping("/multipart/complete")
+    public ResponseEntity<Map<String, String>> completeMultipartUpload(
+            @RequestParam String userId,
+            @RequestParam String videoId,
+            @RequestBody MultipartCompleteRequest request) {
+
+        List<CompletedPart> completedParts = request.parts().stream()
+                .map(part -> CompletedPart.builder()
+                        .partNumber(part.partNumber())
+                        .eTag(part.eTag())
+                        .build())
+                .collect(Collectors.toCollection(ArrayList::new));
+
+        videoStorageService.completeMultipartUpload(
+                userId,
+                videoId,
+                completedParts,
+                request.fileSizeBytes(),
+                request.durationSeconds()
+        );
+
+        return ResponseEntity.ok(Map.of(
+                "status", "SUCCESS",
+                "message", "Video uploaded successfully",
+                "videoId", videoId
+        ));
+    }
+
+    // Request DTOs
+    public record MultipartCompleteRequest(
+            List<MultipartPart> parts,
+            Long fileSizeBytes,
+            Integer durationSeconds
+    ) {
+    }
+
+    public record MultipartPart(
+            Integer partNumber,
+            String eTag
+    ) {
     }
 }

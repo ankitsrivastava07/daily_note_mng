@@ -1,3 +1,4 @@
+
 package com.daily_note_dms.documents.video.entity;
 
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
@@ -11,9 +12,25 @@ public class VideoRecording {
     private Integer durationSeconds;
     private Long fileSizeBytes;
     private String mimeType;
-    private String status; // PENDING, READY, FAILED
+    private String status;
     private String createdAt;
+
+    public String getMultipartUploadId() {
+        return multipartUploadId;
+    }
+
+    public void setMultipartUploadId(String multipartUploadId) {
+        this.multipartUploadId = multipartUploadId;
+    }
+
     private String userId;
+    private String multipartUploadId;
+
+    // Resumable upload tracking
+    private Integer lastUploadedPart;
+    private Integer totalParts;
+    private Long uploadedBytes;
+    private String updatedAt;
 
     @DynamoDbSortKey
     @DynamoDbAttribute("id")
@@ -92,5 +109,41 @@ public class VideoRecording {
 
     public void setCreatedAt(String createdAt) {
         this.createdAt = createdAt;
+    }
+
+    @DynamoDbAttribute("last_uploaded_part")
+    public Integer getLastUploadedPart() {
+        return lastUploadedPart;
+    }
+
+    public void setLastUploadedPart(Integer lastUploadedPart) {
+        this.lastUploadedPart = lastUploadedPart;
+    }
+
+    @DynamoDbAttribute("total_parts")
+    public Integer getTotalParts() {
+        return totalParts;
+    }
+
+    public void setTotalParts(Integer totalParts) {
+        this.totalParts = totalParts;
+    }
+
+    @DynamoDbAttribute("uploaded_bytes")
+    public Long getUploadedBytes() {
+        return uploadedBytes;
+    }
+
+    public void setUploadedBytes(Long uploadedBytes) {
+        this.uploadedBytes = uploadedBytes;
+    }
+
+    @DynamoDbAttribute("updated_at")
+    public String getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(String updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

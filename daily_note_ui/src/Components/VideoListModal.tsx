@@ -14,6 +14,7 @@ export const VideoListModal: React.FC<{ userId: string }> = ({ userId }) => {
   const [videos, setVideos] = useState<VideoItem[]>(clientVideoCache[userId] || []);
   const [selectedVideoUrl, setSelectedVideoUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [errMsg, setErrMsg] = useState<any>(null)
 
   // 1. Component load hote hi videos fetch karo (Cache check karne ke baad)
   useEffect(() => {
@@ -27,7 +28,8 @@ export const VideoListModal: React.FC<{ userId: string }> = ({ userId }) => {
       try {
         setLoading(true);
         const apiBaseUrl = import.meta.env.VITE_DMS_API_BASE_URL || 'http://localhost:9095';
-        const res = await fetch(`${apiBaseUrl}/api/v1/video/list/${userId}`);
+        let refernceId = crypto.randomUUID()
+        const res = await fetch(`${apiBaseUrl}/api/v1/video/reference/${refernceId}/user/${userId}`);
         const data = await res.json();
         const fetchedList = Array.isArray(data) ? data : data.data || [];
 
@@ -35,7 +37,8 @@ export const VideoListModal: React.FC<{ userId: string }> = ({ userId }) => {
         clientVideoCache[userId] = fetchedList;
         setVideos(fetchedList);
       } catch (err) {
-        console.error("Failed to fetch video list", err);
+        console.error("Failed to fetch video list ", err);
+        setErrMsg({ status: 0, message: "Connection lost. Please check your internet." })
       } finally {
         setLoading(false);
       }
@@ -54,6 +57,8 @@ export const VideoListModal: React.FC<{ userId: string }> = ({ userId }) => {
       setSelectedVideoUrl(url);
     } catch (err) {
       console.error("Failed to load playback URL", err);
+      setErrMsg({ status: 0, message: "Connection lost. Please check your internet." })
+
     } finally {
       setLoading(false);
     }
@@ -86,58 +91,73 @@ export const VideoListModal: React.FC<{ userId: string }> = ({ userId }) => {
   };
 
   return (
-    <div style={{ padding: '20px', color: '#fff', background: '#121212', borderRadius: '12px' }}>
-      <h3>🎥 My Recorded Mountain Videos</h3>
+    <>
+      {/* 1. Main Dark Container Box */}
+      <div style={{ padding: '20px', color: '#fff', background: '#121212', borderRadius: '12px' }}>
+        <h3>🎥 My Recorded Mountain Videos</h3>
 
-      {loading && videos.length === 0 && <div style={{ color: '#3b82f6', marginBottom: '10px' }}>Loading videos...</div>}
+        {loading && videos.length === 0 && (
+          <div style={{ color: '#3b82f6', marginBottom: '10px' }}>Loading videos...</div>
+        )}
 
-      {/* Video List Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px', marginTop: '15px' }}>
-        {videos.map((vid) => (
-          <div
-            key={vid.id}
-            onClick={() => handleVideoClick(vid.id)}
-            style={{ background: '#1e1e1e', padding: '15px', borderRadius: '8px', cursor: 'pointer', border: '1px solid #333', position: 'relative' }}
-          >
-            {/* 🗑️ Delete Button */}
-            <button
-              onClick={(e) => handleDeleteVideo(vid.id, e)}
-              style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '16px' }}
-              title="Delete Video"
+        {/* Video List Grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '15px', marginTop: '15px' }}>
+          {videos.map((vid) => (
+            <div
+              key={vid.id}
+              onClick={() => handleVideoClick(vid.id)}
+              style={{ background: '#1e1e1e', padding: '15px', borderRadius: '8px', cursor: 'pointer', border: '1px solid #333', position: 'relative' }}
             >
-              🗑️
-            </button>
+              <button
+                onClick={(e) => handleDeleteVideo(vid.id, e)}
+                style={{ position: 'absolute', top: '10px', right: '10px', background: 'transparent', border: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '16px' }}
+                title="Delete Video"
+              >
+                🗑️
+              </button>
 
-            <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '8px', paddingRight: '20px' }}>Ref: {vid.id}</div>
-            <div style={{ fontSize: '12px', color: '#10B981' }}>Status: {vid.status}</div>
-            <div style={{ marginTop: '10px', fontSize: '12px', color: '#3b82f6' }}>▶ Click to Watch</div>
+              <div style={{ fontWeight: 'bold', fontSize: '14px', marginBottom: '8px', paddingRight: '20px' }}>Ref: {vid.id}</div>
+              <div style={{ fontSize: '12px', color: '#10B981' }}>Status: {vid.status}</div>
+              <div style={{ marginTop: '10px', fontSize: '12px', color: '#3b82f6' }}>▶ Click to Watch</div>
+            </div>
+          ))}
+        </div>
+
+        {/* YouTube Style Popup / Modal Player */}
+        {selectedVideoUrl && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+            backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 99999
+          }}>
+            <div style={{ position: 'relative', width: '80%', maxWidth: '800px', background: '#000', borderRadius: '12px', overflow: 'hidden', padding: '10px' }}>
+              <button
+                onClick={() => setSelectedVideoUrl(null)}
+                style={{ position: 'absolute', top: '15px', right: '15px', background: '#EF4444', color: '#fff', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', zIndex: 10, fontWeight: 'bold' }}
+              >
+                ✕
+              </button>
+              <video
+                src={selectedVideoUrl}
+                controls
+                autoPlay
+                playsInline
+                style={{ width: '100%', maxHeight: '70vh', display: 'block', borderRadius: '8px' }}
+              />
+            </div>
           </div>
-        ))}
+        )}
       </div>
 
-      {/* YouTube Style Popup / Modal Player */}
-      {selectedVideoUrl && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-          backgroundColor: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 99999
-        }}>
-          <div style={{ position: 'relative', width: '80%', maxWidth: '800px', background: '#000', borderRadius: '12px', overflow: 'hidden', padding: '10px' }}>
-            <button
-              onClick={() => setSelectedVideoUrl(null)}
-              style={{ position: 'absolute', top: '15px', right: '15px', background: '#EF4444', color: '#fff', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', zIndex: 10, fontWeight: 'bold' }}
-            >
-              ✕
-            </button>
-            <video
-              src={selectedVideoUrl}
-              controls
-              autoPlay
-              playsInline
-              style={{ width: '100%', maxHeight: '70vh', display: 'block', borderRadius: '8px' }}
-            />
-          </div>
+      {/* 2. Alert ab black box ke bahar aur niche dikhega */}
+      {errMsg?.status === 0 && (
+        <div
+          className="alert alert-danger"
+          role="alert"
+          style={{ marginTop: '20px' }}
+        >
+          {errMsg.message || "Connection lost! Please check your internet connection."}
         </div>
       )}
-    </div>
+    </>
   );
 };
